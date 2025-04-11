@@ -103,7 +103,7 @@ diuse_farm.shortcut(
 )
 
 @diuse_farm.assign("seed-shop")
-async def _(session: Uninfo, num: Query[int] = AlconnaQuery("num", 1)):
+async def _(session: Uninfo, num: Query[int] = AlconnaQuery("num", 0)):
     uid = str(session.user.id)
 
     if await isRegisteredByUid(uid) == False:
