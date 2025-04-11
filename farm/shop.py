@@ -34,7 +34,7 @@ class CShopManager:
 
         sell = ""
         plants = list(g_pJsonManager.m_pPlant['plant'].items())
-        start = (num - 0) * 15
+        start = (num - 1) * 15
         maxItems = min(len(plants) - start, 15)
         items = plants[start:start + maxItems]
 
