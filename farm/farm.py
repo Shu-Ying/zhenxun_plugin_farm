@@ -224,17 +224,9 @@ class CFarmManager:
 
     @classmethod
     async def getUserSeedByUid(cls, uid: str) -> bytes:
-        """获取用户种子仓库
-
-        Args:
-            uid (str): 用户Uid
-
-        Returns:
-            bytes: 返回图片
-        """
-
-        data_list = []
-        column_name = [
+        """获取用户种子仓库"""
+        dataList = []
+        columnNames = [
             "-",
             "种子名称",
             "数量",
@@ -246,59 +238,45 @@ class CFarmManager:
             "是否可以上架交易行"
         ]
 
-        seed = await g_pSqlManager.getUserSeedByUid(uid)
+        # 从数据库获取结构化数据
+        seedRecords = await g_pSqlManager.getUserSeedByUid(uid) or {}
 
-        if seed == None:
+        if not seedRecords:
             result = await ImageTemplate.table_page(
                 "种子仓库",
                 "播种示例：@小真寻 播种 大白菜 [数量]",
-                column_name,
-                data_list,
+                columnNames,
+                dataList,
             )
-
             return result.pic2bytes()
 
-        sell = ""
-        for item in seed.split(','):
-            if '|' in item:
-                seedName, count = item.split('|', 1)  #分割一次，避免多竖线问题
-                try:
-                    plantInfo = g_pJsonManager.m_pPlant['plant'][seedName]
+        for seedName, count in seedRecords.items():
+            try:
+                plantInfo = g_pJsonManager.m_pPlant['plant'][seedName]
+                iconPath = g_sResourcePath / f"plant/{seedName}/icon.png"
+                icon = (iconPath, 33, 33) if iconPath.exists() else ""
+                sellable = "可以" if plantInfo['again'] else "不可以"
 
-                    icon = ""
-                    icon_path = g_sResourcePath / f"plant/{seedName}/icon.png"
-                    if icon_path.exists():
-                        icon = (icon_path, 33, 33)
-
-                    if plantInfo['again'] == True:
-                        sell = "可以"
-                    else:
-                        sell = "不可以"
-
-                    data_list.append(
-                        [
-                            icon,
-                            seedName,
-                            count,
-                            plantInfo['experience'],
-                            plantInfo['harvest'],
-                            plantInfo['time'],
-                            plantInfo['crop'],
-                            plantInfo['again'],
-                            sell
-                        ]
-                    )
-
-                except Exception as e:
-                    continue
+                dataList.append([
+                    icon,
+                    seedName,
+                    count,
+                    plantInfo['experience'],
+                    plantInfo['harvest'],
+                    plantInfo['time'],
+                    plantInfo['crop'],
+                    plantInfo['again'],
+                    sellable
+                ])
+            except KeyError:
+                continue
 
         result = await ImageTemplate.table_page(
             "种子仓库",
             "播种示例：@小真寻 播种 大白菜 [数量]",
-            column_name,
-            data_list,
+            columnNames,
+            dataList,
         )
-
         return result.pic2bytes()
 
     @classmethod
@@ -311,55 +289,58 @@ class CFarmManager:
             num (int, optional): 播种数量
 
         Returns:
-            str:
+            str: 返回结果
         """
+        try:
+            # 获取用户的种子数量
+            count = await g_pSqlManager.getUserSeedByName(uid, name)
+            if count is None:
+                count = 0  # 如果返回 None，则视为没有种子
 
-        number = 0
-        count = await g_pSqlManager.getUserSeedByName(uid, name)
+            if count <= 0:
+                return f"没有在你的仓库发现{name}种子，快去买点吧！"
 
-        if count <= 0:
-            return f"没有在你的仓库发现{name}种子，快去买点吧！"
+            # 如果播种数量超过仓库种子数量
+            if count < num and num != -1:
+                return f"仓库中的{name}种子数量不足，当前剩余{count}个种子"
 
-        #如果播种超过仓库种子
-        isMax = False
-        if count < num:
-            isMax = True
+            # 获取用户土地数量
+            soilNumber = await g_pSqlManager.getUserSoilByUid(uid)
 
-        #如果播种全部
-        isAll = False
-        if num == -1:
-            isAll = True
+            # 如果播种数量为 -1，表示播种所有可播种的土地
+            if num == -1:
+                num = count
 
-        soilNumber = await g_pSqlManager.getUserSoilByUid(uid)
-
-        for i in range(1, soilNumber + 1):
-            if count > 0:
-                if isAll or num > 0:
+            # 记录是否成功播种
+            successCount = 0
+            for i in range(1, soilNumber + 1):
+                if count > 0 and num > 0:
                     soilName = f"soil{i}"
                     success, message = await g_pSqlManager.getUserSoilStatusBySoilID(uid, soilName)
                     if success:
-                        #更新种子数量
+                        # 更新种子数量
                         num -= 1
                         count -= 1
 
-                        #记录种子消耗数量
-                        number -= 1
+                        # 记录种子消耗数量
+                        successCount += 1
 
-                        #更新数据库
+                        # 更新数据库
                         await g_pSqlManager.updateUserSoilStatusByPlantName(uid, soilName, name)
 
-        str = ""
+            # 确保用户仓库数量更新
+            if successCount > 0:
+                await g_pSqlManager.updateUserSeedByName(uid, name, count)
 
-        if isMax:
-            str = f"仓库数量不够那么多，已将剩余数量全部播种！"
-        elif num > 0:
-            str = f"播种数量超出开垦土地数量，已将可播种土地成功播种{name}！仓库还剩下{count}个种子"
-        else:
-            str = f"播种{name}成功！仓库还剩下{count}个种子"
+            # 根据播种结果给出反馈
+            if num == 0:
+                return f"播种{name}成功！仓库剩余{count}个种子"
+            else:
+                return f"播种数量超出开垦土地数量，已将可播种土地成功播种{name}！仓库剩余{count}个种子"
 
-        await g_pSqlManager.addUserSeedByPlant(uid, name, number)
-
-        return str
+        except Exception as e:
+            logger.warning(f"播种操作失败: {e}")
+            return "播种失败，请稍后重试！"
 
     @classmethod
     async def harvest(cls, uid: str) -> str:

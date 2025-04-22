@@ -1,6 +1,7 @@
 import math
 import os
 import re
+from contextlib import asynccontextmanager
 from datetime import date, datetime, timedelta
 from io import StringIO
 from math import e
@@ -37,21 +38,34 @@ class CSqlManager:
         return True
 
     @classmethod
-    async def getColumns(cls, tableName):
-        """ 由AI生成
-            获取表的列信息
-        """
+    @asynccontextmanager
+    async def _transaction(cls):
+        await cls.m_pDB.execute("BEGIN;")
         try:
-            cursor = await cls.m_pDB.execute(f'PRAGMA table_info("{tableName}")')
-            columns = [row[1] for row in await cursor.fetchall()]
-            return columns
-        except aiosqlite.Error as e:
-            logger.error(f"获取表结构失败: {str(e)}")
+            yield
+        except:
+            await cls.m_pDB.execute("ROLLBACK;")
             raise
+        else:
+            await cls.m_pDB.execute("COMMIT;")
 
     @classmethod
-    async def ensure_table_exists(cls, tableName, columns) -> bool:
-        """智能创建并分析数据库表、字段是否存在 由AI生成
+    async def getTableInfo(cls, table_name: str) -> list:
+        if not re.match(r'^[A-Za-z_][A-Za-z0-9_]*$', table_name):
+            raise ValueError(f"Illegal table name: {table_name}")
+        try:
+            cursor = await cls.m_pDB.execute(f'PRAGMA table_info("{table_name}")')
+            rows = await cursor.fetchall()
+            return [{"name": row[1], "type": row[2]} for row in rows]
+        except aiosqlite.Error:
+            return []
+
+
+    @classmethod
+    async def ensureTableSchema(cls, table_name: str, columns: dict) -> bool:
+        """由AI生成
+        创建表或为已存在表添加缺失字段。
+        返回 True 表示有变更（创建或新增列），False 则无操作
 
         Args:
             tableName (_type_): 表名
@@ -60,67 +74,40 @@ class CSqlManager:
         Returns:
             _type_: _description_
         """
-        try:
-            current_columns = await cls.getColumns(tableName)
 
-            #检查表是否存在
-            table_exists = bool(current_columns)
-
-            #如果表不存在，直接创建
-            if not table_exists:
-                create_sql = f'''
-                    CREATE TABLE "{tableName}" (
-                        {", ".join(f'"{k}" {v}' for k, v in columns.items())}
-                    );
-                '''
-                await cls.m_pDB.execute(create_sql)
-                await cls.m_pDB.commit()  #显式提交新建表操作
-                return True
-
-            #表存在时的处理
-            columns_to_add = []
-            columns_to_remove = []
-
-            #检查需要添加的列
-            for k, v in columns.items():
-                if k not in current_columns:
-                    columns_to_add.append(f'"{k}" {v}')
-
-            #检查需要移除的列
-            for col in current_columns:
-                if col not in columns.keys():
-                    columns_to_remove.append(col)
-
-            #执行修改
-            if columns_to_add or columns_to_remove:
-                try:
-                    #开启事务（使用connection级别的事务控制）
-                    await cls.m_pDB.execute('BEGIN TRANSACTION')
-
-                    #添加新列
-                    for col_def in columns_to_add:
-                        await cls.m_pDB.execute(f'ALTER TABLE "{tableName}" ADD COLUMN {col_def}')
-
-                    #删除旧列
-                    for col in columns_to_remove:
-                        await cls.m_pDB.execute(f'ALTER TABLE "{tableName}" DROP COLUMN "{col}"')
-
-                    #显式提交事务
-                    await cls.m_pDB.commit()
-                    return True
-                except Exception as e:
-                    #回滚事务
-                    await cls.m_pDB.rollback()
-                    logger.error(f"表结构迁移失败: {str(e)}")
-
-            return False
-        except aiosqlite.Error as e:
-            logger.error(f"表结构迁移失败: {str(e)}")
-
+        info = await cls.getTableInfo(table_name)
+        existing = {col['name']: col['type'].upper() for col in info}
+        desired = {k: v.upper() for k, v in columns.items()}
+        if not existing:
+            cols_def = ", ".join(f'"{k}" {v}' for k, v in columns.items())
+            await cls.m_pDB.execute(f'CREATE TABLE "{table_name}" ({cols_def});')
+            return True
+        to_add = [k for k in desired if k not in existing]
+        to_remove = [k for k in existing if k not in desired]
+        type_mismatch = [k for k in desired if k in existing and existing[k] != desired[k]]
+        if to_add and not to_remove and not type_mismatch:
+            for col in to_add:
+                await cls.m_pDB.execute(
+                    f'ALTER TABLE "{table_name}" ADD COLUMN "{col}" {columns[col]}'
+                )
+            return True
+        async with cls._transaction():
+            tmp_table = f"{table_name}_new"
+            cols_def = ", ".join(f'"{k}" {v}' for k, v in columns.items())
+            await cls.m_pDB.execute(f'CREATE TABLE "{tmp_table}" ({cols_def});')
+            common_cols = [k for k in desired if k in existing]
+            if common_cols:
+                cols_str = ", ".join(f'"{c}"' for c in common_cols)
+                await cls.m_pDB.execute(
+                    f'INSERT INTO "{tmp_table}" ({cols_str}) SELECT {cols_str} FROM "{table_name}";'
+                )
+            await cls.m_pDB.execute(f'DROP TABLE "{table_name}";')
+            await cls.m_pDB.execute(f'ALTER TABLE "{tmp_table}" RENAME TO "{table_name}";')
         return True
 
     @classmethod
     async def checkDB(cls) -> bool:
+        #1. 用户表
         userInfo = {
             "uid": "INTEGER PRIMARY KEY AUTOINCREMENT",
             "name": "TEXT NOT NULL",
@@ -129,24 +116,32 @@ class CSqlManager:
             "soil": "INTEGER DEFAULT 3",
             "stealing": "TEXT DEFAULT NULL"
         }
-
-        userStorehouse = {
-            "uid": "INTEGER PRIMARY KEY AUTOINCREMENT",
-            "item": "TEXT DEFAULT ''",
-            "plant": "TEXT DEFAULT ''",
-            "seed": "TEXT DEFAULT ''"
-        }
-
+        #2. 土地表
         userSoilInfo = {
             "uid": "INTEGER PRIMARY KEY AUTOINCREMENT",
             **{f"soil{i}": "TEXT DEFAULT ''" for i in range(1, 31)}
         }
+        #3. 用户作物明细表
+        userPlant = {
+            "uid": "INTEGER NOT NULL",
+            "plant": "TEXT NOT NULL",
+            "count": "INTEGER NOT NULL DEFAULT 0",
+            #建联合主键保证每个品种一行
+            "PRIMARY KEY": "(uid, plant)"
+        }
+        #4. 用户种子明细表
+        userSeed = {
+            "uid": "INTEGER NOT NULL",
+            "seed": "TEXT NOT NULL",
+            "count": "INTEGER NOT NULL DEFAULT 0",
+            "PRIMARY KEY": "(uid, seed)"
+        }
 
-        await cls.ensure_table_exists("user", userInfo)
-
-        await cls.ensure_table_exists("storehouse", userStorehouse)
-
-        await cls.ensure_table_exists("soil", userSoilInfo)
+        #建表（或增列）
+        await cls.ensureTableSchema("user", userInfo)
+        await cls.ensureTableSchema("soil", userSoilInfo)
+        await cls.ensureTableSchema("userPlant", userPlant)
+        await cls.ensureTableSchema("userSeed", userSeed)
 
         return True
 
@@ -445,205 +440,261 @@ class CSqlManager:
 
         return await cls.executeDB(sql)
 
+
     @classmethod
-    async def getUserSeedByUid(cls, uid: str) -> str:
-        """获取用户仓库种子信息
+    async def addUserSeedByUid(cls, uid: str, seed: str, count: int = 1) -> bool:
+        """根据用户uid添加种子信息
 
         Args:
-            info (list[dict]): 用户信息
+            uid (str): 用户uid
+            seed (str): 种子名称
+            count (int): 数量
 
         Returns:
-            str: 仓库种子信息
+            bool: 是否添加成功
         """
-
-        if len(uid) <= 0:
-            return ""
-
         try:
-            async with cls.m_pDB.execute(f"SELECT seed FROM storehouse WHERE uid = {uid}") as cursor:
-                async for row in cursor:
-                    return row[0]
+            async with cls._transaction():
+                #检查是否已存在该种子
+                async with cls.m_pDB.execute(
+                    "SELECT count FROM userSeed WHERE uid = ? AND seed = ?",
+                    (uid, seed)
+                ) as cursor:
+                    row = await cursor.fetchone()
 
-            return ""
+                if row:
+                    #如果种子已存在，则更新数量
+                    newCount = row[0] + count
+                    await cls.m_pDB.execute(
+                        "UPDATE userSeed SET count = ? WHERE uid = ? AND seed = ?",
+                        (newCount, uid, seed)
+                    )
+                else:
+                    #如果种子不存在，则插入新记录
+                    newCount = count
+                    await cls.m_pDB.execute(
+                        "INSERT INTO userSeed (uid, seed, count) VALUES (?, ?, ?)",
+                        (uid, seed, count)
+                    )
+
+                #如果种子数量为 0，删除记录
+                if newCount <= 0:
+                    await cls.m_pDB.execute(
+                        "DELETE FROM userSeed WHERE uid = ? AND seed = ?",
+                        (uid, seed)
+                    )
+
+                await cls.m_pDB.commit()
+            return True
         except Exception as e:
-            logger.warning(f"getUserSeedByUid查询失败: {e}")
-            return ""
+            logger.warning(f"真寻农场addUserSeedByUid 失败: {e}")
+            return False
 
     @classmethod
-    async def getUserSeedByName(cls, uid: str, name: str) -> int:
-        """获取用户仓库种子信息
+    async def getUserSeedByName(cls, uid: str, seed: str) -> Optional[int]:
+        """根据种子名称获取种子数量
 
         Args:
-            uid (str): 用户信息
-            name (str): 种子名称
-
-        Returns:
-            int: 仓库种子信息
-        """
-
-        if len(uid) <= 0:
-            return -1
-
-        try:
-            async with cls.m_pDB.execute(f"SELECT seed FROM storehouse WHERE uid = {uid}") as cursor:
-                async for row in cursor:
-                    if row[0] == None or len(row[0]) == 0:
-                        return -1
-
-                    plantDict: Dict[str, int] = {}
-                    for item in row[0].split(','):
-                        if '|' in item:
-                            seedName, count = item.split('|', 1)
-                            plantDict[seedName] = int(count)
-
-                    if name in plantDict:
-                        return plantDict[name]
-                    else:
-                        return -1
-
-            return -1
-        except Exception as e:
-            logger.warning(f"getUserSeedByUid查询失败: {e}")
-            return -1
-
-    @classmethod
-    async def updateUserSeedByUid(cls, uid: str, seed: str) -> bool:
-        """更新用户种子仓库
-
-        Args:
-            uid (str): 用户Uid
+            uid (str): 用户uid
             seed (str): 种子名称
 
         Returns:
-            bool:
+            Optional[int]: 种子数量
         """
-
-        if len(uid) <= 0:
-            return False
-
-        sql = f"UPDATE storehouse SET seed = '{seed}' WHERE uid = {uid}"
-
-        return await cls.executeDB(sql)
-
-    @classmethod
-    async def addUserSeedByPlant(cls, uid: str, seed: str, num: int) -> bool:
-        """添加作物信息至仓库
-
-        Args:
-            uid (str): 用户Uid
-            seed (str): 种子名称
-            num(str): 种子数量
-
-        Returns:
-            bool:
-        """
-
-        if len(uid) <= 0:
-            return False
-
-        seedsDict = {}
-        currentSeeds  = await cls.getUserSeedByUid(uid)
-
-        if currentSeeds:
-            for item in currentSeeds.split(','):
-                if item.strip():
-                    name, count = item.split('|')
-                    seedsDict[name.strip()] = int(count.strip())
-
-        if seed in seedsDict:
-            seedsDict[seed] += num
-            if seedsDict[seed] <= 0:
-                del seedsDict[seed]
-        else:
-            if num > 0:
-                seedsDict[seed] = num
-
-        updatedSeeds = ','.join([f"{name}|{count}" for name, count in seedsDict.items()])
-
-        sql = f"UPDATE storehouse SET seed = '{updatedSeeds}' WHERE uid = {uid}"
-
-        return await cls.executeDB(sql)
-
-    @classmethod
-    async def getUserPlantByUid(cls, uid: str) -> str:
-        """获取用户仓库作物信息
-
-        Args:
-            info (list[dict]): 用户信息
-
-        Returns:
-            str: 仓库作物信息
-        """
-
-        if len(uid) <= 0:
-            return ""
 
         try:
-            async with cls.m_pDB.execute(f"SELECT plant FROM storehouse WHERE uid = {uid}") as cursor:
-                async for row in cursor:
-                    return row[0]
-
-            return ""
+            async with cls.m_pDB.execute(
+                "SELECT count FROM userSeed WHERE uid = ? AND seed = ?",
+                (uid, seed)
+            ) as cursor:
+                row = await cursor.fetchone()
+                return row[0] if row else None
         except Exception as e:
-            logger.warning(f"getUserPlantByUid查询失败: {e}")
-            return ""
+            logger.warning(f"真寻农场getUserSeedByName 查询失败: {e}")
+            return None
 
     @classmethod
-    async def updateUserPlantByUid(cls, uid: str, plant: str) -> bool:
-        """更新用户作物仓库
+    async def getUserSeedByUid(cls, uid: str) -> dict:
+        """根据用户Uid获取仓库全部种子信息
 
         Args:
-            uid (str): 用户Uid
+            uid (str): 用户uid
+
+        Returns:
+            dict: 种子信息
+        """
+
+        cursor = await cls.m_pDB.execute(
+            "SELECT seed, count FROM userSeed WHERE uid=?",
+            (uid,)
+        )
+        rows = await cursor.fetchall()
+        return {row["seed"]: row["count"] for row in rows}
+
+    @classmethod
+    async def updateUserSeedByName(cls, uid: str, seed: str, count: int) -> bool:
+        """根据种子名称更新种子数量
+
+        Args:
+            uid (str): 用户uid
+            seed (str): 种子名称
+            count (int): 种子数量
+
+        Returns:
+            bool: 是否成功
+        """
+
+        try:
+            async with cls._transaction():
+                await cls.m_pDB.execute(
+                    "UPDATE userSeed SET count = ? WHERE uid = ? AND seed = ?",
+                    (count, uid, seed)
+                )
+                await cls.m_pDB.commit()
+            return True
+        except Exception as e:
+            logger.warning(f"真寻农场updateUserSeedByName 更新失败: {e}")
+            return False
+
+    @classmethod
+    async def deleteUserSeedByName(cls, uid: str, seed: str) -> bool:
+        """根据种子名称从种子仓库中删除种子
+
+        Args:
+            uid (str): 用户uid
+            seed (str): 种子名称
+
+        Returns:
+            bool: 是否成功
+        """
+        try:
+            async with cls._transaction():
+                await cls.m_pDB.execute(
+                    "DELETE FROM userSeed WHERE uid = ? AND seed = ?",
+                    (uid, seed)
+                )
+                await cls.m_pDB.commit()
+            return True
+        except Exception as e:
+            logger.warning(f"真寻农场deleteUserSeedByName 删除失败: {e}")
+            return False
+
+    @classmethod
+    async def addUserPlantByUid(cls, uid: str, plant: str, count: int = 1) -> bool:
+        """根据用户uid添加作物信息
+
+        Args:
+            uid (str): 用户uid
+            plant (str): 作物名称
+            count (int): 数量
+
+        Returns:
+            bool: 是否添加成功
+        """
+        try:
+            async with cls._transaction():
+                #检查是否已存在该作物
+                async with cls.m_pDB.execute(
+                    "SELECT count FROM userPlant WHERE uid = ? AND plant = ?",
+                    (uid, plant)
+                ) as cursor:
+                    row = await cursor.fetchone()
+
+                if row:
+                    #如果作物已存在，则更新数量
+                    new_count = row[0] + count
+                    await cls.m_pDB.execute(
+                        "UPDATE userPlant SET count = ? WHERE uid = ? AND plant = ?",
+                        (new_count, uid, plant)
+                    )
+                else:
+                    #如果作物不存在，则插入新记录
+                    await cls.m_pDB.execute(
+                        "INSERT INTO userPlant (uid, plant, count) VALUES (?, ?, ?)",
+                        (uid, plant, count)
+                    )
+                await cls.m_pDB.commit()
+            return True
+        except Exception as e:
+            logger.warning(f"真寻农场addUserPlantByUid 失败: {e}")
+            return False
+
+    @classmethod
+    async def getUserPlantByName(cls, uid: str, plant: str) -> Optional[int]:
+        """根据作物名称获取用户的作物数量
+
+        Args:
+            uid (str): 用户uid
             plant (str): 作物名称
 
         Returns:
-            bool:
+            Optional[int]: 作物数量
         """
-
-        if len(uid) <= 0:
-            return False
-
-        sql = f"UPDATE storehouse SET plant = '{plant}' WHERE uid = {uid}"
-
-        return await cls.executeDB(sql)
+        try:
+            async with cls.m_pDB.execute(
+                "SELECT count FROM userPlant WHERE uid = ? AND plant = ?",
+                (uid, plant)
+            ) as cursor:
+                row = await cursor.fetchone()
+                return row[0] if row else None
+        except Exception as e:
+            logger.warning(f"真寻农场getUserPlantByName 查询失败: {e}")
+            return None
 
     @classmethod
-    async def addUserPlantByPlant(cls, uid: str, plant: str, num: int) -> bool:
-        """添加作物信息至仓库
+    async def updateUserPlantByUid(cls, uid: str, plant: str, count: int) -> bool:
+        """更新 userPlant 表中某个作物的数量
 
         Args:
-            uid (str): 用户Uid
+            uid (str): 用户uid
             plant (str): 作物名称
-            num(str): 作物数量
+            count (int): 新的作物数量
 
         Returns:
-            bool:
+            bool: 是否更新成功
         """
+        try:
+            async with cls._transaction():
+                #更新作物数量
+                await cls.m_pDB.execute(
+                    "UPDATE userPlant SET count = ? WHERE uid = ? AND plant = ?",
+                    (count, uid, plant)
+                )
 
-        if len(uid) <= 0:
+                #如果作物数量为 0，删除记录
+                if count <= 0:
+                    await cls.m_pDB.execute(
+                        "DELETE FROM userPlant WHERE uid = ? AND plant = ?",
+                        (uid, plant)
+                    )
+
+                await cls.m_pDB.commit()
+            return True
+        except Exception as e:
+            logger.warning(f"真寻农场updateUserPlantByUid 更新失败: {e}")
             return False
 
-        plantsDict = {}
-        currentPlants  = await cls.getUserPlantByUid(uid)
+    @classmethod
+    async def deleteUserPlantByUid(cls, uid: str, plant: str) -> bool:
+        """从 userPlant 表中删除某个作物记录
 
-        if currentPlants:
-            for item in currentPlants.split(','):
-                if item.strip():
-                    name, count = item.split('|')
-                    plantsDict[name.strip()] = int(count.strip())
+        Args:
+            uid (str): 用户uid
+            plant (str): 作物名称
 
-        if plant in plantsDict:
-            plantsDict[plant] += num
-            if plantsDict[plant] <= 0:
-                del plantsDict[plant]
-        else:
-            if num > 0:
-                plantsDict[plant] = num
-
-        updatedPlants = ','.join([f"{name}|{count}" for name, count in plantsDict.items()])
-
-        sql = f"UPDATE storehouse SET plant = '{updatedPlants}' WHERE uid = {uid}"
-
-        return await cls.executeDB(sql)
+        Returns:
+            bool: 是否删除成功
+        """
+        try:
+            async with cls._transaction():
+                await cls.m_pDB.execute(
+                    "DELETE FROM userPlant WHERE uid = ? AND plant = ?",
+                    (uid, plant)
+                )
+                await cls.m_pDB.commit()
+            return True
+        except Exception as e:
+            logger.warning(f"真寻农场deleteUserPlantByUid 删除失败: {e}")
+            return False
 
 g_pSqlManager = CSqlManager()
