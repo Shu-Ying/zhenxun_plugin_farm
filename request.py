@@ -1,5 +1,4 @@
-from email.mime import base
-from unittest import result
+import os
 
 import httpx
 
@@ -11,11 +10,11 @@ class CRequestManager:
 
     @classmethod
     async def download(cls, url: str, savePath: str, fileName: str) -> bool:
-        """下载文件到指定路径
+        """下载文件到指定路径并覆盖已存在的文件
 
         Args:
             url (str): 文件的下载链接
-            savePath (str): 保存文件的文件夹路径
+            savePath (str): 保存文件夹路径
             fileName (str): 保存后的文件名
 
         Returns:
@@ -25,7 +24,8 @@ class CRequestManager:
             async with httpx.AsyncClient(timeout=10.0) as client:
                 response = await client.get(url)
                 if response.status_code == 200:
-                    fullPath = savePath.rstrip("/") + "/" + fileName
+                    fullPath = os.path.join(savePath, fileName)
+                    os.makedirs(os.path.dirname(fullPath), exist_ok=True)
                     with open(fullPath, "wb") as f:
                         f.write(response.content)
                     return True

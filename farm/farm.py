@@ -51,7 +51,7 @@ class CFarmManager:
         return f"充值{point}农场币成功，手续费{tax}金币，当前农场币：{number}"
 
     @classmethod
-    async def drawFarmByUid(cls, uid: str, name: str) -> bytes:
+    async def drawFarmByUid(cls, uid: str) -> bytes:
         """绘制用户农场
 
         Args:
@@ -72,7 +72,9 @@ class CFarmManager:
         await grass.resize(0, soilSize[0], soilSize[1])
 
         soilPos = g_pJsonManager.m_pSoil['soil']
-        soilUnlock = await g_pSqlManager.getUserSoilByUid(uid)
+
+        userInfo = await g_pSqlManager.getUserInfoByUid(uid)
+        soilUnlock = int(userInfo['soil'])
 
         x = 0
         y = 0
@@ -128,7 +130,7 @@ class CFarmManager:
         await img.paste(frame, (75, 44))
 
         #用户名
-        nameImg = await BuildImage.build_text_image(name, size = 24, font_color = (77, 35, 4))
+        nameImg = await BuildImage.build_text_image(userInfo['name'], size = 24, font_color = (77, 35, 4))
         await img.paste(nameImg, (300, 92))
 
         #经验值
@@ -148,12 +150,10 @@ class CFarmManager:
         await img.paste(levelImg, (660, 187))
 
         #金币
-        point = await g_pSqlManager.getUserPointByUid(uid)
-        pointImg = await BuildImage.build_text_image(str(point), size = 24, font_color = (253, 253, 253))
+        pointImg = await BuildImage.build_text_image(str(userInfo['point']), size = 24, font_color = (253, 253, 253))
         await img.paste(pointImg, (330, 255))
 
-        #点券
-        bonds = await g_pSqlManager.getUserPointByUid(uid)
+        #点券 TODO
         bondsImg = await BuildImage.build_text_image("0", size = 24, font_color = (253, 253, 253))
         await img.paste(bondsImg, (570, 255))
 
@@ -473,14 +473,14 @@ class CFarmManager:
         if plant is None:
             result = await ImageTemplate.table_page(
                 "作物仓库",
-                "播种示例：@小真寻 出售作物 大白菜 [数量]",
+                "出售示例：@小真寻 出售作物 大白菜 [数量]",
                 column_name,
                 data_list,
             )
             return result.pic2bytes()
 
         sell = ""
-        for name, count in plant.items():  # 使用 .items() 来遍历字典
+        for name, count in plant.items():
             plantInfo = g_pJsonManager.m_pPlant['plant'][name]
             icon = ""
             icon_path = g_sResourcePath / f"plant/{name}/icon.png"
@@ -507,7 +507,7 @@ class CFarmManager:
 
         result = await ImageTemplate.table_page(
             "作物仓库",
-            "播种示例：@小真寻 出售作物 大白菜 [数量]",
+            "出售示例：@小真寻 出售作物 大白菜 [数量]",
             column_name,
             data_list,
         )

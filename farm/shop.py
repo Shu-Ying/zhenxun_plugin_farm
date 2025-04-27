@@ -23,7 +23,7 @@ class CShopManager:
         column_name = [
             "-",
             "种子名称",
-            "种子单价"
+            "种子单价",
             "解锁等级",
             "果实单价",
             "收获经验",
@@ -132,39 +132,39 @@ class CShopManager:
         Returns:
             str:
         """
-        plantDict = await g_pSqlManager.getUserPlantByUid(uid)
-        if not plantDict:
+        if not isinstance(name, str) or name.strip() == "":
+            name = ""
+
+        plant = await g_pSqlManager.getUserPlantByUid(uid)
+        if not plant:
             return "你仓库没有可以出售的作物"
 
-        totalPoint = 0
+        point = 0
+        totalSold = 0
+        isAll = (num == -1)
 
-        if not name:
-            for plantName, count in plantDict.items():
+        if name == "":
+            for plantName, count in plant.items():
                 plantInfo = g_pJsonManager.m_pPlant['plant'][plantName]
-                totalPoint += plantInfo['price'] * count
-                await g_pSqlManager.deleteUserPlantByName(uid, plantName)
+                point += plantInfo['price'] * count
+                await g_pSqlManager.updateUserPlantByName(uid, plantName, 0)
         else:
-            currentCount = plantDict.get(name)
-            if currentCount is None:
-                return f"出售作物{name}出错：你没有这种作物"
+            if name not in plant:
+                return f"出售作物{name}出错：仓库中不存在该作物"
+            available = plant[name]
+            sellAmount = available if isAll else min(available, num)
+            if sellAmount <= 0:
+                return f"出售作物{name}出错：数量不足"
+            await g_pSqlManager.updateUserPlantByName(uid, name, available - sellAmount)
+            totalSold = sellAmount
 
-            if num == -1:
-                sellCount = currentCount
-            else:
-                if num > currentCount:
-                    return f"出售作物{name}出错：数量不足"
-                sellCount = num
+        totalPoint = point if name == "" else totalSold * g_pJsonManager.m_pPlant['plant'][name]['price']
+        currentPoint = await g_pSqlManager.getUserPointByUid(uid)
+        await g_pSqlManager.updateUserPointByUid(uid, currentPoint + totalPoint)
 
-            plantInfo = g_pJsonManager.m_pPlant['plant'][name]
-            totalPoint = plantInfo['price'] * sellCount
-            await g_pSqlManager.addUserPlantByUid(uid, name, -sellCount)
-
-        point = await g_pSqlManager.getUserPointByUid(uid)
-        await g_pSqlManager.updateUserPointByUid(uid, point + totalPoint)
-
-        if not name:
-            return f"成功出售所有作物，获得农场币：{totalPoint}，当前农场币：{point + totalPoint}"
+        if name == "":
+            return f"成功出售所有作物，获得农场币：{totalPoint}，当前农场币：{currentPoint + totalPoint}"
         else:
-            return f"成功出售{name}，获得农场币：{totalPoint}，当前农场币：{point + totalPoint}"
+            return f"成功出售{name}，获得农场币：{totalPoint}，当前农场币：{currentPoint + totalPoint}"
 
 g_pShopManager = CShopManager()

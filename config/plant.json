@@ -215,6 +215,21 @@
         "番茄":
         {
             "level": 6,
+            "buy": 251,
+            "limit": 0,
+            "experience": 22,
+            "harvest": 21,
+            "price": 26,
+            "time": 17,
+            "crop": 1,
+            "again": 0,
+            "phase": 6,
+            "general": true,
+            "sell": false
+        },
+        "ATTomato":
+        {
+            "level": 6,
             "buy": 99999,
             "limit": 0,
             "experience": 22,

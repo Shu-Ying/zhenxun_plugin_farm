@@ -1,9 +1,9 @@
 from nonebot.adapters import Event, MessageTemplate
 from nonebot.rule import to_me
 from nonebot.typing import T_State
-from nonebot_plugin_alconna import (Alconna, AlconnaQuery, Args, Arparma, At,
-                                    Match, MultiVar, Option, Query, Subcommand,
-                                    on_alconna, store_true)
+from nonebot_plugin_alconna import (Alconna, AlconnaMatch, AlconnaQuery, Args,
+                                    Arparma, At, Match, MultiVar, Option,
+                                    Query, Subcommand, on_alconna, store_true)
 from nonebot_plugin_uninfo import Uninfo
 from nonebot_plugin_waiter import waiter
 
@@ -46,18 +46,18 @@ async def handle_register(session: Uninfo):
         # 获取原始用户名并安全处理
         raw_name = str(session.user.name)
         safe_name = sanitize_username(raw_name)
-        
+
         # 初始化用户信息
         success = await g_pSqlManager.initUserInfoByUid(
             uid=uid,
             name=safe_name,
             exp=0,
-            point=100
+            point=500
         )
 
         msg = (
-            "✅ 农场开通成功！\n💼 初始资金：100农场币" 
-            if success 
+            "✅ 农场开通成功！\n💼 初始资金：500农场币"
+            if success
             else "⚠️ 开通失败，请稍后再试"
         )
         logger.info(f"用户注册 {'成功' if success else '失败'}：{uid}")
@@ -65,9 +65,9 @@ async def handle_register(session: Uninfo):
     except Exception as e:
         msg = "⚠️ 系统繁忙，请稍后再试"
         logger.error(f"注册异常 | UID:{uid} | 错误：{str(e)}")
-    
+
     await MessageUtils.build_message(msg).send(reply_to=True)
-  
+
 def sanitize_username(username: str, max_length: int = 15) -> str:
     """
     安全处理用户名
@@ -81,14 +81,14 @@ def sanitize_username(username: str, max_length: int = 15) -> str:
     # 处理空值
     if not username:
         return "神秘农夫"
-    
+
     # 基础清洗
     cleaned = username.strip()
-    
+
     # 允许的字符白名单（可自定义扩展）
     safe_chars = {
         '_', '-', '!', '@', '#', '$', '%', '^', '&', '*', '(', ')',
-        '+', '=', '.', ',', '~', '·', ' ', 
+        '+', '=', '.', ',', '~', '·', ' ',
         'a','b','c','d','e','f','g','h','i','j','k','l','m',
         'n','o','p','q','r','s','t','u','v','w','x','y','z',
         'A','B','C','D','E','F','G','H','I','J','K','L','M',
@@ -97,24 +97,24 @@ def sanitize_username(username: str, max_length: int = 15) -> str:
     }
     # 添加常用中文字符（Unicode范围）
     safe_chars.update(chr(c) for c in range(0x4E00, 0x9FFF+1))
-    
+
     # 过滤危险字符
     filtered = [
-        c if c in safe_chars or 0x4E00 <= ord(c) <= 0x9FFF 
-        else '' 
+        c if c in safe_chars or 0x4E00 <= ord(c) <= 0x9FFF
+        else ''
         for c in cleaned
     ]
-    
+
     # 合并处理结果
     safe_str = ''.join(filtered)
-    
+
     # 转义单引号（双重保障）
     escaped = safe_str.replace("'", "''")
-    
+
     # 处理空结果
     if not escaped:
         return "神秘农夫"
-    
+
     # 长度限制
     return escaped[:max_length]
 
@@ -130,24 +130,24 @@ diuse_farm = on_alconna(
         Subcommand("harvest", help_text="收获"),
         Subcommand("eradicate", help_text="铲除"),
         Subcommand("my-plant", help_text="我的作物"),
-        # Subcommand("reclamation", Args["isBool?", str], help_text="开垦"),
         Subcommand("sell-plant", Args["name?", str]["num?", int], help_text="出售作物"),
         Subcommand("stealing", Args["target?", At], help_text="偷菜"),
         Subcommand("buy-point", Args["num?", int], help_text="购买农场币"),
         #Subcommand("sell-point", Args["num?", int], help_text="转换金币")
+        Subcommand("change-name", Args["name?", str], help_text="更改农场名")
     ),
     priority=5,
     block=True,
 )
 
 @diuse_farm.assign("$main")
-async def _(session: Uninfo, nickname: str = UserName()):
+async def _(session: Uninfo):
     uid = str(session.user.id)
 
     if await isRegisteredByUid(uid) == False:
         return
 
-    image = await g_pFarmManager.drawFarmByUid(uid, nickname)
+    image = await g_pFarmManager.drawFarmByUid(uid)
     await MessageUtils.build_message(image).send(reply_to=True)
 
 diuse_farm.shortcut(
@@ -339,12 +339,7 @@ diuse_farm.shortcut(
 )
 
 @diuse_farm.assign("sell-plant")
-async def _(session: Uninfo, name: Match[str], num: Query[int] = AlconnaQuery("num", 1),):
-    if not name.available:
-        await MessageUtils.build_message(
-            "请在指令后跟需要出售的作物名称"
-        ).finish(reply_to=True)
-
+async def _(session: Uninfo, name: Match[str], num: Query[int] = AlconnaQuery("num", -1),):
     uid = str(session.user.id)
 
     if await isRegisteredByUid(uid) == False:
@@ -401,3 +396,32 @@ async def _(session: Uninfo, num: Query[int] = AlconnaQuery("num", 0)):
 
     result = await g_pFarmManager.buyPointByUid(uid, num.result)
     await MessageUtils.build_message(result).send(reply_to=True)
+
+
+diuse_farm.shortcut(
+    "更改农场名(?P<name>)",
+    command="我的农场",
+    arguments=["change-name", "{name}"],
+    prefix=True,
+)
+
+@diuse_farm.assign("change-name")
+async def _(session: Uninfo, name: Match[str]):
+    if not name.available:
+        await MessageUtils.build_message(
+            "请在指令后跟需要更改的用户名"
+        ).finish(reply_to=True)
+
+    uid = str(session.user.id)
+
+    if await isRegisteredByUid(uid) == False:
+        return
+
+    safeName = sanitize_username(name.result)
+
+    result = await g_pSqlManager.updateUserNameByUid(uid, safeName)
+
+    if result == True:
+        await MessageUtils.build_message("更新用户名成功！").send(reply_to=True)
+    else:
+        await MessageUtils.build_message("更新用户名失败！").send(reply_to=True)

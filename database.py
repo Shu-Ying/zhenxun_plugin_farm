@@ -143,12 +143,20 @@ class CSqlManager:
             "count": "INTEGER NOT NULL DEFAULT 0",
             "PRIMARY KEY": "(uid, seed)"
         }
+        # 5. 用户道具明细表
+        userItem = {
+            "uid": "INTEGER NOT NULL",
+            "item": "TEXT NOT NULL",
+            "count": "INTEGER NOT NULL DEFAULT 0",
+            "PRIMARY KEY": "(uid, item)"
+        }
 
         #建表（或增列）
         await cls.ensureTableSchema("user", userInfo)
         await cls.ensureTableSchema("soil", userSoilInfo)
         await cls.ensureTableSchema("userPlant", userPlant)
         await cls.ensureTableSchema("userSeed", userSeed)
+        await cls.ensureTableSchema("userItem", userItem)
 
         return True
 
@@ -175,7 +183,7 @@ class CSqlManager:
             return False
 
     @classmethod
-    async def initUserInfoByUid(cls, uid: str, name: str = "", exp: int = 0, point: int = 100):
+    async def initUserInfoByUid(cls, uid: str, name: str = "", exp: int = 0, point: int = 500):
         """初始化用户信息
 
         Args:
@@ -190,20 +198,12 @@ class CSqlManager:
             INSERT INTO user (uid, name, exp, point, soil, stealing) VALUES ({uid}, '{name}', {exp}, {point}, 3, '{date.today()}|5')
             """
 
-        #用户仓库
-        userStorehouse = f"""
-            INSERT INTO storehouse (uid) VALUES ({uid});
-            """
-
         #用户土地
         userSoilInfo = f"""
             INSERT INTO soil (uid) VALUES ({uid});
             """
 
         if not await cls.executeDB(userInfo):
-            return False
-
-        if not await cls.executeDB(userStorehouse):
             return False
 
         if not await cls.executeDB(userSoilInfo):
@@ -243,6 +243,55 @@ class CSqlManager:
         except Exception as e:
             logger.warning(f"getUserInfoByUid查询失败: {e}")
             return {}
+
+    @classmethod
+    async def getUserNameByUid(cls, uid: str) -> str:
+        """根据用户uid查询用户名
+
+        Args:
+            uid (str): 用户uid
+
+        Returns:
+            str: 用户名，如果失败返回空字符串
+        """
+        if not uid:
+            return ""
+
+        try:
+            async with cls.m_pDB.execute(
+                "SELECT name FROM user WHERE uid = ?",
+                (uid,)
+            ) as cursor:
+                row = await cursor.fetchone()
+                return row["name"] if row else ""
+        except Exception as e:
+            logger.warning(f"真寻农场getUserNameByUid查询失败: {e}")
+            return ""
+
+    @classmethod
+    async def updateUserNameByUid(cls, uid: str, name: str) -> bool:
+        """根据用户uid修改用户名
+
+        Args:
+            uid (str): 用户uid
+            name (str): 新用户名
+
+        Returns:
+            bool: 是否更新成功
+        """
+        if not uid or not name:
+            return False
+
+        try:
+            async with cls._transaction():
+                await cls.m_pDB.execute(
+                    "UPDATE user SET name = ? WHERE uid = ?",
+                    (name, uid)
+                )
+            return True
+        except Exception as e:
+            logger.warning(f"真寻农场updateUserNameByUid失败: {e}")
+            return False
 
     @classmethod
     async def getUserPointByUid(cls, uid: str) -> int:
@@ -707,6 +756,154 @@ class CSqlManager:
             return True
         except Exception as e:
             logger.warning(f"真寻农场deleteUserPlantByName 失败: {e}")
+            return False
+
+
+    @classmethod
+    async def getUserItemByName(cls, uid: str, item: str) -> Optional[int]:
+        """根据道具名称查询某一项数量
+
+        Args:
+            uid (str): 用户uid
+            item (str): 道具名称
+
+        Returns:
+            Optional[int]: 数量（不存在返回None）
+        """
+        if not uid or not item:
+            return None
+        try:
+            async with cls.m_pDB.execute(
+                "SELECT count FROM userItem WHERE uid = ? AND item = ?",
+                (uid, item)
+            ) as cursor:
+                row = await cursor.fetchone()
+                return row[0] if row else None
+        except Exception as e:
+            logger.warning(f"真寻农场getUserItemByName查询失败: {e}")
+            return None
+
+    @classmethod
+    async def getUserItemByUid(cls, uid: str) -> dict:
+        """根据用户Uid获取全部道具信息
+
+        Args:
+            uid (str): 用户uid
+
+        Returns:
+            dict: {itemName: count, ...}
+        """
+        if not uid:
+            return {}
+        try:
+            cursor = await cls.m_pDB.execute(
+                "SELECT item, count FROM userItem WHERE uid = ?",
+                (uid,)
+            )
+            rows = await cursor.fetchall()
+            return {row["item"]: row["count"] for row in rows}
+        except Exception as e:
+            logger.warning(f"真寻农场getUserItemByUid查询失败: {e}")
+            return {}
+
+    @classmethod
+    async def deleteUserItemByName(cls, uid: str, item: str) -> bool:
+        """根据道具名删除道具
+
+        Args:
+            uid (str): 用户uid
+            item (str): 道具名称
+
+        Returns:
+            bool: 是否删除成功
+        """
+        if not uid or not item:
+            return False
+        try:
+            async with cls._transaction():
+                await cls.m_pDB.execute(
+                    "DELETE FROM userItem WHERE uid = ? AND item = ?",
+                    (uid, item)
+                )
+            return True
+        except Exception as e:
+            logger.warning(f"真寻农场deleteUserItemByName失败: {e}")
+            return False
+
+    @classmethod
+    async def updateUserItemByName(cls, uid: str, item: str, count: int) -> bool:
+        """根据道具名直接更新道具数量
+
+        Args:
+            uid (str): 用户uid
+            item (str): 道具名称
+            count (int): 要更新的新数量
+
+        Returns:
+            bool: 是否更新成功
+        """
+        if not uid or not item:
+            return False
+        try:
+            async with cls._transaction():
+                if count <= 0:
+                    await cls.m_pDB.execute(
+                        "DELETE FROM userItem WHERE uid = ? AND item = ?",
+                        (uid, item)
+                    )
+                else:
+                    await cls.m_pDB.execute(
+                        "UPDATE userItem SET count = ? WHERE uid = ? AND item = ?",
+                        (count, uid, item)
+                    )
+            return True
+        except Exception as e:
+            logger.warning(f"真寻农场updateUserItemByName失败: {e}")
+            return False
+
+    @classmethod
+    async def addUserItemByUid(cls, uid: str, item: str, count: int = 1) -> bool:
+        """根据用户uid添加道具信息
+
+        Args:
+            uid (str): 用户uid
+            item (str): 道具名称
+            count (int, optional): 数量.Defaults to 1.
+
+        Returns:
+            bool: 是否添加成功
+        """
+        if not uid or not item:
+            return False
+        try:
+            async with cls._transaction():
+                async with cls.m_pDB.execute(
+                    "SELECT count FROM userItem WHERE uid = ? AND item = ?",
+                    (uid, item)
+                ) as cursor:
+                    row = await cursor.fetchone()
+
+                if row:
+                    newCount = row[0] + count
+                    if newCount <= 0:
+                        await cls.m_pDB.execute(
+                            "DELETE FROM userItem WHERE uid = ? AND item = ?",
+                            (uid, item)
+                        )
+                    else:
+                        await cls.m_pDB.execute(
+                            "UPDATE userItem SET count = ? WHERE uid = ? AND item = ?",
+                            (newCount, uid, item)
+                        )
+                else:
+                    if count > 0:
+                        await cls.m_pDB.execute(
+                            "INSERT INTO userItem (uid, item, count) VALUES (?, ?, ?)",
+                            (uid, item, count)
+                        )
+            return True
+        except Exception as e:
+            logger.warning(f"真寻农场addUserItemByUid失败: {e}")
             return False
 
 g_pSqlManager = CSqlManager()
