@@ -1,4 +1,5 @@
 import math
+from re import I
 
 from zhenxun.services.log import logger
 from zhenxun.utils._build_image import BuildImage
@@ -22,8 +23,9 @@ class CShopManager:
         column_name = [
             "-",
             "种子名称",
+            "种子单价"
             "解锁等级",
-            "种子单价",
+            "果实单价",
             "收获经验",
             "收获数量",
             "成熟时间（小时）",
@@ -53,6 +55,7 @@ class CShopManager:
                 [
                     icon,
                     key,
+                    plant['buy'],
                     plant['level'],
                     plant['price'],
                     plant['experience'],
@@ -105,7 +108,7 @@ class CShopManager:
             return "你的等级不够哦，努努力吧"
 
         point = await g_pSqlManager.getUserPointByUid(uid)
-        total = int(plantInfo['price']) * num
+        total = int(plantInfo['buy']) * num
 
         logger.debug(f"用户：{uid}购买{name}，数量为{num}。用户农场币为{point}，购买需要{total}")
 
@@ -114,7 +117,7 @@ class CShopManager:
         else:
             await g_pSqlManager.updateUserPointByUid(uid, point - total)
 
-            if await g_pSqlManager.addUserSeedByPlant(uid, name, num) == False:
+            if await g_pSqlManager.addUserSeedByUid(uid, name, num) == False:
                 return "购买失败，执行数据库错误！"
 
             return f"成功购买{name}，花费{total}农场币, 剩余{point - total}农场币"
@@ -129,81 +132,39 @@ class CShopManager:
         Returns:
             str:
         """
-
-        plant = await g_pSqlManager.getUserPlantByUid(uid)
-
-        if plant == None:
+        plantDict = await g_pSqlManager.getUserPlantByUid(uid)
+        if not plantDict:
             return "你仓库没有可以出售的作物"
 
-        point = 0
-        totalSold = 0
-        remainingItems = []
+        totalPoint = 0
 
-        isAll = False
-        if num == -1:
-            isAll = True
-
-        items = plant.split(',')
-        if len(name) <= 0:
-            #出售全部
-            for item in items:
-                if '|' in item:
-                    plant_name, count_str = item.split('|', 1)
-                    try:
-                        count = int(count_str)
-                        plant_info = g_pJsonManager.m_pPlant['plant'][plant_name]
-                        point += plant_info['price'] * count
-                    except Exception:
-                        continue
-
-            await g_pSqlManager.updateUserPlantByUid(uid, "")  # 清空仓库
+        if not name:
+            for plantName, count in plantDict.items():
+                plantInfo = g_pJsonManager.m_pPlant['plant'][plantName]
+                totalPoint += plantInfo['price'] * count
+                await g_pSqlManager.deleteUserPlantByName(uid, plantName)
         else:
-            for item in items:
-                if '|' in item:
-                    plantName, countStr = item.split('|', 1)
-                    try:
-                        count = int(countStr)
-                        if plantName == name:
+            currentCount = plantDict.get(name)
+            if currentCount is None:
+                return f"出售作物{name}出错：你没有这种作物"
 
-                            if isAll:
-                                sellAmount = count
-                            else:
-                                sellAmount = min(num, count)
+            if num == -1:
+                sellCount = currentCount
+            else:
+                if num > currentCount:
+                    return f"出售作物{name}出错：数量不足"
+                sellCount = num
 
-                            totalSold += sellAmount
-                            remaining = count - sellAmount
-
-                            if remaining > 0:
-                                remainingItems.append(f"{plantName}|{remaining}")
-
-                            if isAll == False:
-                                num -= sellAmount
-
-                            break
-                    except (ValueError, TypeError):
-                        continue
-
-        if num > 0 and isAll == False:
-            return f"出售作物{name}出错：数量不足"
-
-        #计算收益
-        try:
             plantInfo = g_pJsonManager.m_pPlant['plant'][name]
-            totalPoint = plantInfo['price'] * totalSold
-        except KeyError:
-            return f"出售作物{name}出错：作物不存在"
+            totalPoint = plantInfo['price'] * sellCount
+            await g_pSqlManager.addUserPlantByUid(uid, name, -sellCount)
 
-        #更新剩余作物
-        remainingPlant = ','.join(remainingItems) if remainingItems else ""
-        await g_pSqlManager.updateUserPlantByUid(uid, remainingPlant)
+        point = await g_pSqlManager.getUserPointByUid(uid)
+        await g_pSqlManager.updateUserPointByUid(uid, point + totalPoint)
 
-        #更新农场币
-        p = await g_pSqlManager.getUserPointByUid(uid)
-        await g_pSqlManager.updateUserPointByUid(uid, p + totalPoint)
-
-        if name:
-            return f"成功出售{name}，获得农场币：{totalPoint}"
+        if not name:
+            return f"成功出售所有作物，获得农场币：{totalPoint}，当前农场币：{point + totalPoint}"
         else:
-            return f"成功出售所有作物，获得农场币：{totalPoint}"
+            return f"成功出售{name}，获得农场币：{totalPoint}，当前农场币：{point + totalPoint}"
 
 g_pShopManager = CShopManager()

@@ -28,10 +28,7 @@ class CSqlManager:
         bIsExist = os.path.exists(g_sDBFilePath)
 
         cls.m_pDB = await aiosqlite.connect(g_sDBFilePath)
-
-        #if bIsExist == False:
-            #TODO 缺少判断创建失败事件
-            #await cls.createDB()
+        cls.m_pDB.row_factory = aiosqlite.Row
 
         await cls.checkDB()
 
@@ -50,11 +47,11 @@ class CSqlManager:
             await cls.m_pDB.execute("COMMIT;")
 
     @classmethod
-    async def getTableInfo(cls, table_name: str) -> list:
-        if not re.match(r'^[A-Za-z_][A-Za-z0-9_]*$', table_name):
-            raise ValueError(f"Illegal table name: {table_name}")
+    async def getTableInfo(cls, tableName: str) -> list:
+        if not re.match(r'^[A-Za-z_][A-Za-z0-9_]*$', tableName):
+            raise ValueError(f"Illegal table name: {tableName}")
         try:
-            cursor = await cls.m_pDB.execute(f'PRAGMA table_info("{table_name}")')
+            cursor = await cls.m_pDB.execute(f'PRAGMA table_info("{tableName}")')
             rows = await cursor.fetchall()
             return [{"name": row[1], "type": row[2]} for row in rows]
         except aiosqlite.Error:
@@ -62,7 +59,7 @@ class CSqlManager:
 
 
     @classmethod
-    async def ensureTableSchema(cls, table_name: str, columns: dict) -> bool:
+    async def ensureTableSchema(cls, tableName: str, columns: dict) -> bool:
         """由AI生成
         创建表或为已存在表添加缺失字段。
         返回 True 表示有变更（创建或新增列），False 则无操作
@@ -75,34 +72,44 @@ class CSqlManager:
             _type_: _description_
         """
 
-        info = await cls.getTableInfo(table_name)
+        info = await cls.getTableInfo(tableName)
         existing = {col['name']: col['type'].upper() for col in info}
-        desired = {k: v.upper() for k, v in columns.items()}
+        desired = {k: v.upper() for k, v in columns.items() if k != "PRIMARY KEY"}
+        primaryKey = columns.get("PRIMARY KEY", "")
+
         if not existing:
-            cols_def = ", ".join(f'"{k}" {v}' for k, v in columns.items())
-            await cls.m_pDB.execute(f'CREATE TABLE "{table_name}" ({cols_def});')
+            colsDef = ", ".join(f'"{k}" {v}' for k, v in desired.items())
+            if primaryKey:
+                colsDef += f", PRIMARY KEY {primaryKey}"
+            await cls.m_pDB.execute(f'CREATE TABLE "{tableName}" ({colsDef});')
             return True
-        to_add = [k for k in desired if k not in existing]
-        to_remove = [k for k in existing if k not in desired]
-        type_mismatch = [k for k in desired if k in existing and existing[k] != desired[k]]
-        if to_add and not to_remove and not type_mismatch:
-            for col in to_add:
+
+        toAdd = [k for k in desired if k not in existing]
+        toRemove = [k for k in existing if k not in desired]
+        typeMismatch = [k for k in desired if k in existing and existing[k] != desired[k]]
+
+        if toAdd and not toRemove and not typeMismatch:
+            for col in toAdd:
                 await cls.m_pDB.execute(
-                    f'ALTER TABLE "{table_name}" ADD COLUMN "{col}" {columns[col]}'
+                    f'ALTER TABLE "{tableName}" ADD COLUMN "{col}" {columns[col]}'
                 )
             return True
+
         async with cls._transaction():
-            tmp_table = f"{table_name}_new"
-            cols_def = ", ".join(f'"{k}" {v}' for k, v in columns.items())
-            await cls.m_pDB.execute(f'CREATE TABLE "{tmp_table}" ({cols_def});')
-            common_cols = [k for k in desired if k in existing]
-            if common_cols:
-                cols_str = ", ".join(f'"{c}"' for c in common_cols)
+            tmpTable = f"{tableName}_new"
+            colsDef = ", ".join(f'"{k}" {v}' for k, v in desired.items())
+            if primaryKey:
+                colsDef += f", PRIMARY KEY {primaryKey}"
+            await cls.m_pDB.execute(f'CREATE TABLE "{tmpTable}" ({colsDef});')
+
+            commonCols = [k for k in desired if k in existing]
+            if commonCols:
+                colsStr = ", ".join(f'"{c}"' for c in commonCols)
                 await cls.m_pDB.execute(
-                    f'INSERT INTO "{tmp_table}" ({cols_str}) SELECT {cols_str} FROM "{table_name}";'
+                    f'INSERT INTO "{tmpTable}" ({colsStr}) SELECT {colsStr} FROM "{tableName}";'
                 )
-            await cls.m_pDB.execute(f'DROP TABLE "{table_name}";')
-            await cls.m_pDB.execute(f'ALTER TABLE "{tmp_table}" RENAME TO "{table_name}";')
+            await cls.m_pDB.execute(f'DROP TABLE "{tableName}";')
+            await cls.m_pDB.execute(f'ALTER TABLE "{tmpTable}" RENAME TO "{tableName}";')
         return True
 
     @classmethod
@@ -155,17 +162,16 @@ class CSqlManager:
         Returns:
             bool: 是否执行成功
         """
-
         if len(command) <= 0:
-            logger.warning("数据库语句长度不能！")
+            logger.warning("数据库语句长度为空！")
             return False
 
         try:
-            await cls.m_pDB.execute(command)
-            await cls.m_pDB.commit()
+            async with cls._transaction():
+                await cls.m_pDB.execute(command)
             return True
         except Exception as e:
-            logger.warning("数据库语句执行出错：" + command)
+            logger.warning("数据库语句执行出错:" + command)
             return False
 
     @classmethod
@@ -483,8 +489,6 @@ class CSqlManager:
                         "DELETE FROM userSeed WHERE uid = ? AND seed = ?",
                         (uid, seed)
                     )
-
-                await cls.m_pDB.commit()
             return True
         except Exception as e:
             logger.warning(f"真寻农场addUserSeedByUid 失败: {e}")
@@ -543,17 +547,18 @@ class CSqlManager:
         Returns:
             bool: 是否成功
         """
-
         try:
+            if count <= 0:
+                return await cls.deleteUserSeedByName(uid, seed)
+
             async with cls._transaction():
                 await cls.m_pDB.execute(
                     "UPDATE userSeed SET count = ? WHERE uid = ? AND seed = ?",
                     (count, uid, seed)
                 )
-                await cls.m_pDB.commit()
             return True
         except Exception as e:
-            logger.warning(f"真寻农场updateUserSeedByName 更新失败: {e}")
+            logger.warning(f"真寻农场updateUserSeedByName失败:{e}")
             return False
 
     @classmethod
@@ -573,7 +578,6 @@ class CSqlManager:
                     "DELETE FROM userSeed WHERE uid = ? AND seed = ?",
                     (uid, seed)
                 )
-                await cls.m_pDB.commit()
             return True
         except Exception as e:
             logger.warning(f"真寻农场deleteUserSeedByName 删除失败: {e}")
@@ -613,11 +617,27 @@ class CSqlManager:
                         "INSERT INTO userPlant (uid, plant, count) VALUES (?, ?, ?)",
                         (uid, plant, count)
                     )
-                await cls.m_pDB.commit()
             return True
         except Exception as e:
             logger.warning(f"真寻农场addUserPlantByUid 失败: {e}")
             return False
+
+    @classmethod
+    async def getUserPlantByUid(cls, uid: str) -> Dict[str, int]:
+        """根据用户uid获取全部作物信息
+
+        Args:
+            uid (str): 用户uid
+
+        Returns:
+            Dict[str, int]: 作物名称和数量
+        """
+        cursor = await cls.m_pDB.execute(
+            "SELECT plant, count FROM userPlant WHERE uid=?",
+            (uid,)
+        )
+        rows = await cursor.fetchall()
+        return {row["plant"]: row["count"] for row in rows}
 
     @classmethod
     async def getUserPlantByName(cls, uid: str, plant: str) -> Optional[int]:
@@ -642,7 +662,7 @@ class CSqlManager:
             return None
 
     @classmethod
-    async def updateUserPlantByUid(cls, uid: str, plant: str, count: int) -> bool:
+    async def updateUserPlantByName(cls, uid: str, plant: str, count: int) -> bool:
         """更新 userPlant 表中某个作物的数量
 
         Args:
@@ -654,28 +674,21 @@ class CSqlManager:
             bool: 是否更新成功
         """
         try:
+            if count <= 0:
+                return await cls.deleteUserPlantByName(uid, plant)
+
             async with cls._transaction():
-                #更新作物数量
                 await cls.m_pDB.execute(
                     "UPDATE userPlant SET count = ? WHERE uid = ? AND plant = ?",
                     (count, uid, plant)
                 )
-
-                #如果作物数量为 0，删除记录
-                if count <= 0:
-                    await cls.m_pDB.execute(
-                        "DELETE FROM userPlant WHERE uid = ? AND plant = ?",
-                        (uid, plant)
-                    )
-
-                await cls.m_pDB.commit()
             return True
         except Exception as e:
-            logger.warning(f"真寻农场updateUserPlantByUid 更新失败: {e}")
+            logger.warning(f"真寻农场updateUserPlantByName失败:{e}")
             return False
 
     @classmethod
-    async def deleteUserPlantByUid(cls, uid: str, plant: str) -> bool:
+    async def deleteUserPlantByName(cls, uid: str, plant: str) -> bool:
         """从 userPlant 表中删除某个作物记录
 
         Args:
@@ -691,10 +704,9 @@ class CSqlManager:
                     "DELETE FROM userPlant WHERE uid = ? AND plant = ?",
                     (uid, plant)
                 )
-                await cls.m_pDB.commit()
             return True
         except Exception as e:
-            logger.warning(f"真寻农场deleteUserPlantByUid 删除失败: {e}")
+            logger.warning(f"真寻农场deleteUserPlantByName 失败: {e}")
             return False
 
 g_pSqlManager = CSqlManager()

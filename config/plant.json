@@ -3,10 +3,11 @@
     "zhuShi":
     [
         "level: 解锁等级",
+        "buy: 购买价格",
         "limit: 限制等级  0：普通土地 1：红土地 2：黄土地 3：黑土地",
         "experience: 收获经验",
         "harvest: 收获数量",
-        "price: 单价",
+        "price: 果实售价",
         "time: 成熟时间 小时",
         "crop: 作物可以收几次",
         "again: 再次成熟时间 单位：小时",
@@ -19,6 +20,7 @@
         "胡萝卜":
         {
             "level": 0,
+            "buy": 163,
             "limit": 0,
             "experience": 18,
             "harvest": 17,
@@ -33,6 +35,7 @@
         "白萝卜":
         {
             "level": 0,
+            "buy": 125,
             "limit": 0,
             "experience": 15,
             "harvest": 16,
@@ -47,6 +50,7 @@
         "牧草":
         {
             "level": 0,
+            "buy": 80,
             "limit": 0,
             "experience": 10,
             "harvest": 25,
@@ -61,6 +65,7 @@
         "大白菜":
         {
             "level": 1,
+            "buy": 168,
             "limit": 0,
             "experience": 19,
             "harvest": 17,
@@ -75,6 +80,7 @@
         "大蒜":
         {
             "level": 1,
+            "buy": 169,
             "limit": 0,
             "experience": 19,
             "harvest": 17,
@@ -89,6 +95,7 @@
         "水稻":
         {
             "level": 2,
+            "buy": 168,
             "limit": 0,
             "experience": 19,
             "harvest": 18,
@@ -96,13 +103,14 @@
             "time": 14,
             "crop": 1,
             "again": 0,
-            "phase": 6,
-            "general": true,
+            "phase": 5,
+            "general": false,
             "sell": false
         },
         "小麦":
         {
             "level": 2,
+            "buy": 168,
             "limit": 0,
             "experience": 19,
             "harvest": 18,
@@ -117,6 +125,7 @@
         "玉米":
         {
             "level": 3,
+            "buy": 175,
             "limit": 0,
             "experience": 19,
             "harvest": 17,
@@ -131,6 +140,7 @@
         "油菜":
         {
             "level": 4,
+            "buy": 194,
             "limit": 0,
             "experience": 29,
             "harvest": 23,
@@ -145,11 +155,102 @@
         "生菜":
         {
             "level": 4,
+            "buy": 195,
             "limit": 0,
             "experience": 25,
             "harvest": 21,
             "price": 24,
             "time": 19,
+            "crop": 1,
+            "again": 0,
+            "phase": 6,
+            "general": true,
+            "sell": false
+        },
+        "小白菜":
+        {
+            "level": 4,
+            "buy": 195,
+            "limit": 0,
+            "experience": 15,
+            "harvest": 18,
+            "price": 21,
+            "time": 11,
+            "crop": 1,
+            "again": 0,
+            "phase": 5,
+            "general": true,
+            "sell": false
+        },
+        "红枣":
+        {
+            "level": 5,
+            "buy": 237,
+            "limit": 0,
+            "experience": 21,
+            "harvest": 20,
+            "price": 25,
+            "time": 16,
+            "crop": 1,
+            "again": 0,
+            "phase": 6,
+            "general": true,
+            "sell": false
+        },
+        "茄子":
+        {
+            "level": 5,
+            "buy": 237,
+            "limit": 0,
+            "experience": 21,
+            "harvest": 20,
+            "price": 25,
+            "time": 16,
+            "crop": 1,
+            "again": 0,
+            "phase": 6,
+            "general": true,
+            "sell": false
+        },
+        "番茄":
+        {
+            "level": 6,
+            "buy": 99999,
+            "limit": 0,
+            "experience": 22,
+            "harvest": 21,
+            "price": 7000,
+            "time": 17,
+            "crop": 1,
+            "again": 0,
+            "phase": 6,
+            "general": true,
+            "sell": false
+        },
+        "红玫瑰":
+        {
+            "level": 7,
+            "buy": 251,
+            "limit": 0,
+            "experience": 23,
+            "harvest": 22,
+            "price": 27,
+            "time": 18,
+            "crop": 1,
+            "again": 0,
+            "phase": 6,
+            "general": true,
+            "sell": false
+        },
+        "豌豆":
+        {
+            "level": 7,
+            "buy": 266,
+            "limit": 0,
+            "experience": 23,
+            "harvest": 22,
+            "price": 27,
+            "time": 18,
             "crop": 1,
             "again": 0,
             "phase": 6,

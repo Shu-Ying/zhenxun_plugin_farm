@@ -213,9 +213,12 @@ class CFarmManager:
 
                 currentStage = int(elapsedHour / (plantInfo['time'] / (plantInfo['phase'] - 1)))
 
-                #TODO 缺少判断部分种子是否是通用0阶段图片
                 if currentStage <= 0:
-                    plant = BuildImage(background = g_sResourcePath / f"plant/basic/0.png")
+                    if plantInfo['general'] == False:
+                        plant = BuildImage(background = g_sResourcePath / f"plant/{soilInfo[0]}/0.png")
+                    else:
+                        plant = BuildImage(background = g_sResourcePath / f"plant/basic/0.png")
+
                     await plant.resize(0, 35, 58)
                 else:
                     plant = BuildImage(background = g_sResourcePath / f"plant/{soilInfo[0]}/{currentStage}.png")
@@ -395,7 +398,7 @@ class CFarmManager:
                 harvestRecords.append(f"收获作物：{plantId}，数量为：{number}，经验为：{plantInfo['experience']}")
 
                 #更新数据库操作
-                await g_pSqlManager.addUserPlantByPlant(uid, plantId, number)
+                await g_pSqlManager.addUserPlantByUid(uid, plantId, number)
                 await g_pSqlManager.updateUserSoilStatusByPlantName(uid, soil_name, "", 4)
 
         if experience > 0:
@@ -455,7 +458,6 @@ class CFarmManager:
         Returns:
             bytes: 返回图片
         """
-
         data_list = []
         column_name = [
             "-",
@@ -468,48 +470,40 @@ class CFarmManager:
 
         plant = await g_pSqlManager.getUserPlantByUid(uid)
 
-        if plant == None:
+        if plant is None:
             result = await ImageTemplate.table_page(
                 "作物仓库",
                 "播种示例：@小真寻 出售作物 大白菜 [数量]",
                 column_name,
                 data_list,
             )
-
             return result.pic2bytes()
 
         sell = ""
-        for item in plant.split(','):
-            if '|' in item:
-                plantName, count = item.split('|', 1)  #分割一次，避免多竖线问题
-                try:
-                    plantInfo = g_pJsonManager.m_pPlant['plant'][plantName]
+        for name, count in plant.items():  # 使用 .items() 来遍历字典
+            plantInfo = g_pJsonManager.m_pPlant['plant'][name]
+            icon = ""
+            icon_path = g_sResourcePath / f"plant/{name}/icon.png"
+            if icon_path.exists():
+                icon = (icon_path, 33, 33)
 
-                    icon = ""
-                    icon_path = g_sResourcePath / f"plant/{plantName}/icon.png"
-                    if icon_path.exists():
-                        icon = (icon_path, 33, 33)
+            if plantInfo['again'] == True:
+                sell = "可以"
+            else:
+                sell = "不可以"
 
-                    if plantInfo['again'] == True:
-                        sell = "可以"
-                    else:
-                        sell = "不可以"
+            number = int(count) * plantInfo['price']
 
-                    number = int(count) * plantInfo['price']
-
-                    data_list.append(
-                        [
-                            icon,
-                            plantName,
-                            count,
-                            plantInfo['price'],
-                            number,
-                            sell
-                        ]
-                    )
-
-                except Exception as e:
-                    continue
+            data_list.append(
+                [
+                    icon,
+                    name,
+                    count,
+                    plantInfo['price'],
+                    number,
+                    sell
+                ]
+            )
 
         result = await ImageTemplate.table_page(
             "作物仓库",
@@ -611,7 +605,7 @@ class CFarmManager:
                 logger.info(f"{randomNumber}")
 
                 if randomNumber > 0:
-                    await g_pSqlManager.addUserPlantByPlant(uid, plantId, randomNumber)
+                    await g_pSqlManager.addUserPlantByUid(uid, plantId, randomNumber)
 
                     harvestRecords.append(f"成功偷到作物：{plantId}，数量为：{randomNumber}")
                     stealingStatus.append(f"{uid}-{randomNumber}")
