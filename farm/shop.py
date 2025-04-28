@@ -6,7 +6,7 @@ from zhenxun.utils._build_image import BuildImage
 from zhenxun.utils.image_utils import ImageTemplate
 
 from ..config import g_pJsonManager, g_sResourcePath
-from ..database import g_pSqlManager
+from ..dbService import g_pDBService
 
 
 class CShopManager:
@@ -102,12 +102,12 @@ class CShopManager:
         except Exception as e:
             return "购买出错！请检查需购买的种子名称！"
 
-        level = await g_pSqlManager.getUserLevelByUid(uid)
+        level = await g_pDBService.user.getUserLevelByUid(uid)
 
         if level[0] < int(plantInfo['level']):
             return "你的等级不够哦，努努力吧"
 
-        point = await g_pSqlManager.getUserPointByUid(uid)
+        point = await g_pDBService.user.getUserPointByUid(uid)
         total = int(plantInfo['buy']) * num
 
         logger.debug(f"用户：{uid}购买{name}，数量为{num}。用户农场币为{point}，购买需要{total}")
@@ -115,9 +115,9 @@ class CShopManager:
         if point < total:
             return "你的农场币不够哦~ 快速速氪金吧！"
         else:
-            await g_pSqlManager.updateUserPointByUid(uid, point - total)
+            await g_pDBService.user.updateUserPointByUid(uid, point - total)
 
-            if await g_pSqlManager.addUserSeedByUid(uid, name, num) == False:
+            if await g_pDBService.userSeed.addUserSeedByUid(uid, name, num) == False:
                 return "购买失败，执行数据库错误！"
 
             return f"成功购买{name}，花费{total}农场币, 剩余{point - total}农场币"
@@ -135,7 +135,7 @@ class CShopManager:
         if not isinstance(name, str) or name.strip() == "":
             name = ""
 
-        plant = await g_pSqlManager.getUserPlantByUid(uid)
+        plant = await g_pDBService.userPlant.getUserPlantByUid(uid)
         if not plant:
             return "你仓库没有可以出售的作物"
 
@@ -147,7 +147,7 @@ class CShopManager:
             for plantName, count in plant.items():
                 plantInfo = g_pJsonManager.m_pPlant['plant'][plantName]
                 point += plantInfo['price'] * count
-                await g_pSqlManager.updateUserPlantByName(uid, plantName, 0)
+                await g_pDBService.userPlant.updateUserPlantByName(uid, plantName, 0)
         else:
             if name not in plant:
                 return f"出售作物{name}出错：仓库中不存在该作物"
@@ -155,12 +155,12 @@ class CShopManager:
             sellAmount = available if isAll else min(available, num)
             if sellAmount <= 0:
                 return f"出售作物{name}出错：数量不足"
-            await g_pSqlManager.updateUserPlantByName(uid, name, available - sellAmount)
+            await g_pDBService.userPlant.updateUserPlantByName(uid, name, available - sellAmount)
             totalSold = sellAmount
 
         totalPoint = point if name == "" else totalSold * g_pJsonManager.m_pPlant['plant'][name]['price']
-        currentPoint = await g_pSqlManager.getUserPointByUid(uid)
-        await g_pSqlManager.updateUserPointByUid(uid, currentPoint + totalPoint)
+        currentPoint = await g_pDBService.user.getUserPointByUid(uid)
+        await g_pDBService.user.updateUserPointByUid(uid, currentPoint + totalPoint)
 
         if name == "":
             return f"成功出售所有作物，获得农场币：{totalPoint}，当前农场币：{currentPoint + totalPoint}"
