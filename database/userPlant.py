@@ -1,8 +1,8 @@
 from typing import Dict, Optional
 
-from database import CSqlManager
-
 from zhenxun.services.log import logger
+
+from .database import CSqlManager
 
 
 class CUserPlantDB(CSqlManager):
@@ -56,7 +56,7 @@ class CUserPlantDB(CSqlManager):
                     )
             return True
         except Exception as e:
-            logger.warning(f"真寻农场addUserPlantByUid 失败！", e=e)
+            logger.warning(f"addUserPlantByUid 失败！", e=e)
             return False
 
     @classmethod
@@ -95,7 +95,7 @@ class CUserPlantDB(CSqlManager):
                 row = await cursor.fetchone()
                 return row[0] if row else None
         except Exception as e:
-            logger.warning(f"真寻农场getUserPlantByName 查询失败！", e=e)
+            logger.warning(f"getUserPlantByName 查询失败！", e=e)
             return None
 
     @classmethod
@@ -121,7 +121,7 @@ class CUserPlantDB(CSqlManager):
                 )
             return True
         except Exception as e:
-            logger.warning(f"真寻农场updateUserPlantByName失败！", e=e)
+            logger.warning(f"updateUserPlantByName失败！", e=e)
             return False
 
     @classmethod
@@ -143,5 +143,5 @@ class CUserPlantDB(CSqlManager):
                 )
             return True
         except Exception as e:
-            logger.warning(f"真寻农场deleteUserPlantByName 失败！", e=e)
+            logger.warning(f"deleteUserPlantByName 失败！", e=e)
             return False

@@ -8,7 +8,6 @@ import aiosqlite
 from zhenxun.services.log import logger
 
 from ..config import g_sDBFilePath, g_sDBPath
-from ..dbService import g_pDBService
 
 
 class CSqlManager:
@@ -26,8 +25,6 @@ class CSqlManager:
 
         cls.m_pDB = await aiosqlite.connect(g_sDBFilePath)
         cls.m_pDB.row_factory = aiosqlite.Row
-
-        await g_pDBService.init()
 
         return True
 

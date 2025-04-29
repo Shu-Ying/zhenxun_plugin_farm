@@ -37,47 +37,73 @@ class CRequestManager:
             return False
 
     @classmethod
-    async def post(cls, endpoint: str, name: str = "", jsonData: dict = None, formData: dict = None) -> dict:
-        """发送POST请求到指定接口，供其他方法统一调用
+    async def post(cls, endpoint: str, name: str = "", jsonData: dict = None) -> dict:
+        """发送POST请求到指定接口，统一调用，仅支持JSON格式数据
 
         Args:
             endpoint (str): 请求的接口路径
             name (str, optional): 操作名称用于日志记录
-            jsonData (dict, optional): 以JSON格式发送的数据
-            formData (dict, optional): 以表单格式发送的数据
+            jsonData (dict): 以JSON格式发送的数据
 
         Raises:
-            ValueError: 当jsonData和formData都未提供时抛出
+            ValueError: 当jsonData未提供时抛出
 
         Returns:
             dict: 返回请求结果的JSON数据
         """
-        if jsonData is None and formData is None:
-            raise ValueError("post请求必须提供jsonData或formData其中之一")
+        if jsonData is None:
+            raise ValueError("post请求必须提供jsonData")
 
         baseUrl = Config.get_config("zhenxun_plugin_farm", "服务地址")
-
         url = f"{baseUrl.rstrip('/')}/{endpoint.lstrip('/')}"
+        headers = {"token": "xZ%?z5LtWV7H:0-Xnwp+bNRNQ-jbfrxG"}
 
         try:
             async with httpx.AsyncClient(timeout=5.0) as client:
-                if jsonData is not None:
-                    response = await client.post(url, json=jsonData)
-                else:
-                    response = await client.post(url, data=formData)
+                response = await client.post(url, json=jsonData, headers=headers)
 
                 if response.status_code == 200:
                     return response.json()
                 else:
-                    logger.warning(f"真寻农场{name}请求失败: HTTP {response.status_code} {response.text}")
+                    logger.warning(f"{name}请求失败: HTTP {response.status_code} {response.text}")
                     return {}
         except httpx.RequestError as e:
-            logger.warning(f"真寻农场{name}请求异常: {e}")
+            logger.warning(f"{name}请求异常", e=e)
             return {}
         except Exception as e:
-            logger.warning(f"真寻农场{name}处理异常: {e}")
+            logger.warning(f"{name}处理异常", e=e)
             return {}
 
+    @classmethod
+    async def get(cls, endpoint: str, name: str = "") -> dict:
+        """发送GET请求到指定接口，统一调用，仅支持无体的查询
+
+        Args:
+            endpoint (str): 请求的接口路径
+            name (str, optional): 操作名称用于日志记录
+
+        Returns:
+            dict: 返回请求结果的JSON数据
+        """
+        baseUrl = Config.get_config("zhenxun_plugin_farm", "服务地址")
+        url = f"{baseUrl.rstrip('/')}/{endpoint.lstrip('/')}"
+        headers = {"token": "xZ%?z5LtWV7H:0-Xnwp+bNRNQ-jbfrxG"}
+
+        try:
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                response = await client.get(url, headers=headers)
+
+                if response.status_code == 200:
+                    return response.json()
+                else:
+                    logger.warning(f"{name}请求失败: HTTP {response.status_code} {response.text}")
+                    return {}
+        except httpx.RequestError as e:
+            logger.warning(f"{name}请求异常", e=e)
+            return {}
+        except Exception as e:
+            logger.warning(f"{name}处理异常", e=e)
+            return {}
 
     @classmethod
     async def sign(cls, uid: str) -> str:

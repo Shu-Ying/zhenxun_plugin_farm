@@ -1,6 +1,6 @@
-from database import CSqlManager
-
 from zhenxun.services.log import logger
+
+from .database import CSqlManager
 
 
 class CUserStealDB(CSqlManager):

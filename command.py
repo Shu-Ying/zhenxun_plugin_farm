@@ -1,6 +1,5 @@
 from nonebot.adapters import Event, MessageTemplate
 from nonebot.rule import to_me
-from nonebot.typing import T_State
 from nonebot_plugin_alconna import (Alconna, AlconnaMatch, AlconnaQuery, Args,
                                     Arparma, At, Match, MultiVar, Option,
                                     Query, Subcommand, on_alconna, store_true)
@@ -11,15 +10,15 @@ from zhenxun.services.log import logger
 from zhenxun.utils.depends import UserName
 from zhenxun.utils.message import MessageUtils
 
-from .database import g_pSqlManager
+from .dbService import g_pDBService
 from .farm.farm import g_pFarmManager
 from .farm.shop import g_pShopManager
 
 
 async def isRegisteredByUid(uid: str) -> bool:
-    point = await g_pSqlManager.getUserPointByUid(uid)
+    result = await g_pDBService.user.isUserExist(uid)
 
-    if point < 0:
+    if not result:
         await MessageUtils.build_message("尚未开通农场，快at我发送 开通农场 开通吧").send()
         return False
 
@@ -36,7 +35,7 @@ diuse_register = on_alconna(
 @diuse_register.handle()
 async def handle_register(session: Uninfo):
     uid = str(session.user.id)
-    user = await g_pSqlManager.getUserInfoByUid(uid)
+    user = await g_pDBService.user.getUserInfoByUid(uid)
 
     if user:
         await MessageUtils.build_message("🎉 您已经开通农场啦~").send(reply_to=True)
@@ -48,7 +47,7 @@ async def handle_register(session: Uninfo):
         safe_name = sanitize_username(raw_name)
 
         # 初始化用户信息
-        success = await g_pSqlManager.initUserInfoByUid(
+        success = await g_pDBService.user.initUserInfoByUid(
             uid=uid,
             name=safe_name,
             exp=0,
@@ -160,7 +159,7 @@ diuse_farm.shortcut(
 @diuse_farm.assign("my-point")
 async def _(session: Uninfo):
     uid = str(session.user.id)
-    point = await g_pSqlManager.getUserPointByUid(uid)
+    point = await g_pDBService.user.getUserPointByUid(uid)
 
     if point < 0:
         await MessageUtils.build_message("尚未开通农场，快at我发送 开通农场 开通吧").send()
@@ -366,9 +365,9 @@ async def _(session: Uninfo, target: Match[At]):
         await MessageUtils.build_message("请在指令后跟需要at的人").finish(reply_to=True)
 
     tar = target.result
-    point = await g_pSqlManager.getUserPointByUid(tar.target)
+    result = await g_pDBService.user.isUserExist(tar.target)
 
-    if point < 0:
+    if not result:
         await MessageUtils.build_message("目标尚未开通农场，快邀请ta开通吧").send()
         return None
 
@@ -419,7 +418,7 @@ async def _(session: Uninfo, name: Match[str]):
 
     safeName = sanitize_username(name.result)
 
-    result = await g_pSqlManager.updateUserNameByUid(uid, safeName)
+    result = await g_pDBService.user.updateUserNameByUid(uid, safeName)
 
     if result == True:
         await MessageUtils.build_message("更新用户名成功！").send(reply_to=True)

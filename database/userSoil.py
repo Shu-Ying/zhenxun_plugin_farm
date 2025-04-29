@@ -1,28 +1,27 @@
 from datetime import date, datetime, timedelta
 from typing import Optional
 
-from database import CSqlManager
-
 from zhenxun.services.log import logger
 
 from ..config import g_pJsonManager
 from ..dbService import g_pDBService
+from .database import CSqlManager
 
 
 class CUserSoilDB(CSqlManager):
     @classmethod
     async def initDB(cls):
-        #用户Uid
-        #地块索引从1开始
-        #作物名称
-        #播种时间
-        #成熟时间
-        #土地等级 0=普通地，1=红土地，2=黑土地，3=金土地
-        #枯萎状态 0=未枯萎，1=枯萎
-        #施肥状态 0=未施肥，1=施肥
-        #虫害状态 0=无虫害，1=有虫害
-        #杂草状态 0=无杂草，1=有杂草
-        #缺水状态 0=不缺水，1=缺水
+        # 用户Uid
+        # 地块索引从1开始
+        # 作物名称
+        # 播种时间
+        # 成熟时间
+        # 土地等级 0=普通地，1=红土地，2=黑土地，3=金土地
+        # 枯萎状态 0=未枯萎，1=枯萎
+        # 施肥状态 0=未施肥，1=施肥
+        # 虫害状态 0=无虫害，1=有虫害
+        # 杂草状态 0=无杂草，1=有杂草
+        # 缺水状态 0=不缺水，1=缺水
         userSoil = {
             "uid": "TEXT NOT NULL",
             "soilIndex": "INTEGER NOT NULL",
@@ -35,7 +34,7 @@ class CUserSoilDB(CSqlManager):
             "bugStatus": "INTEGER DEFAULT 0",
             "weedStatus": "INTEGER DEFAULT 0",
             "waterStatus": "INTEGER DEFAULT 0",
-            "PRIMARY KEY": "(uid, soilIndex)"
+            "PRIMARY KEY": "(uid, soilIndex)",
         }
 
         await cls.ensureTableSchema("userSoil", userSoil)
@@ -52,61 +51,50 @@ class CUserSoilDB(CSqlManager):
         """
         cursor = await cls.m_pDB.execute("SELECT * FROM soil WHERE uid = ?", (uid,))
         row = await cursor.fetchone()
+
         if not row:
             return {}
         columns = [description[0] for description in cursor.description]
         return dict(zip(columns, row))
 
     @classmethod
-    async def migrateOldFarmData(cls):
+    async def migrateOldFarmData(cls) -> bool:
         """迁移旧土地数据到新表 userSoil 并删除旧表
 
-        Raises:
-            aiosqlite.Error: 数据库操作失败时抛出
-
         Returns:
-            None
+            bool: 如果旧表不存在则返回 False，否则迁移并删除后返回 True
         """
+        # 检查旧表是否存在
+        cursor = await cls.m_pDB.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='soil'"
+        )
+        if not await cursor.fetchone():
+            return False
+
         async with cls._transaction():
             users = await g_pDBService.user.getAllUsers()
+
             for uid in users:
                 farmInfo = await cls.getUserFarmByUid(uid)
                 for i in range(1, 31):
-                    soilName = f"soil{i}"
-                    if soilName not in farmInfo:
+                    key = f"soil{i}"
+                    data = farmInfo.get(key)
+                    if not data:
                         continue
-                    soilData = farmInfo[soilName]
-                    if not soilData:
+                    parts = data.split(",")
+                    if len(parts) < 3:
                         continue
+                    name = parts[0]
+                    pt = int(parts[1])
+                    mt = int(parts[2])
 
-                    fields = soilData.split(',')
-                    if len(fields) < 6:
-                        continue
+                    await cls.m_pDB.execute(
+                        "INSERT INTO userSoil (uid,soilIndex,plantName,plantTime,matureTime) VALUES (?,?,?,?,?)",
+                        (uid, i, name, pt, mt),
+                    )
 
-                    plantName = fields[0]
-                    plantTime = int(fields[1])
-                    matureTime = int(fields[2])
-                    soilLevel = int(fields[5])
-
-                    # 构建新的土地数据
-                    soilInfo = {
-                        "uid": uid,
-                        "soilIndex": i,
-                        "plantName": plantName,
-                        "plantTime": plantTime,
-                        "matureTime": matureTime,
-                        "soilLevel": soilLevel,
-                        "wiltStatus":0,
-                        "fertilizerStatus": 0,
-                        "bugStatus": 0,
-                        "weedStatus": 0,
-                        "waterStatus": 0
-                    }
-
-                    await cls.insertUserSoil(soilInfo)
-
-            # 彻底清除旧表
             await cls.m_pDB.execute("DROP TABLE soil")
+        return True
 
     @classmethod
     async def insertUserSoil(cls, soilInfo: dict):
@@ -131,9 +119,35 @@ class CUserSoilDB(CSqlManager):
                     soilInfo.get("fertilizerStatus", 0),
                     soilInfo.get("bugStatus", 0),
                     soilInfo.get("weedStatus", 0),
-                    soilInfo.get("waterStatus", 0)
-                )
+                    soilInfo.get("waterStatus", 0),
+                ),
             )
+
+    @classmethod
+    async def _insertUserSoil(cls, soilInfo: dict):
+        """插入一条新的 userSoil 记录
+
+        Args:
+            soilInfo (dict): 新土地数据
+
+        Returns:
+            None
+        """
+        await cls.m_pDB.execute(
+            "INSERT INTO userSoil (uid, soilIndex, plantName, plantTime, matureTime, soilLevel, fertilizerStatus, bugStatus, weedStatus, waterStatus) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                soilInfo["uid"],
+                soilInfo["soilIndex"],
+                soilInfo.get("plantName", ""),
+                soilInfo.get("plantTime", 0),
+                soilInfo.get("matureTime", 0),
+                soilInfo.get("soilLevel", 0),
+                soilInfo.get("fertilizerStatus", 0),
+                soilInfo.get("bugStatus", 0),
+                soilInfo.get("weedStatus", 0),
+                soilInfo.get("waterStatus", 0),
+            ),
+        )
 
     @classmethod
     async def getUserSoil(cls, uid: str, soilIndex: int) -> Optional[dict]:
@@ -149,13 +163,34 @@ class CUserSoilDB(CSqlManager):
         async with cls._transaction():
             cursor = await cls.m_pDB.execute(
                 "SELECT * FROM userSoil WHERE uid = ? AND soilIndex = ?",
-                (uid, soilIndex)
+                (uid, soilIndex),
             )
             row = await cursor.fetchone()
             if not row:
                 return None
             columns = [description[0] for description in cursor.description]
             return dict(zip(columns, row))
+
+    @classmethod
+    async def _getUserSoil(cls, uid: str, soilIndex: int) -> Optional[dict]:
+        """获取指定用户某块土地的详细信息
+
+        Args:
+            uid (str): 用户ID
+            soilIndex (int): 土地索引
+
+        Returns:
+            Optional[dict]: 记录存在返回字段-值字典，否则返回 None
+        """
+        cursor = await cls.m_pDB.execute(
+            "SELECT * FROM userSoil WHERE uid = ? AND soilIndex = ?",
+            (uid, soilIndex),
+        )
+        row = await cursor.fetchone()
+        if not row:
+            return None
+        columns = [description[0] for description in cursor.description]
+        return dict(zip(columns, row))
 
     @classmethod
     async def updateUserSoil(cls, uid: str, soilIndex: int, field: str, value):
@@ -173,8 +208,26 @@ class CUserSoilDB(CSqlManager):
         async with cls._transaction():
             await cls.m_pDB.execute(
                 f"UPDATE userSoil SET {field} = ? WHERE uid = ? AND soilIndex = ?",
-                (value, uid, soilIndex)
+                (value, uid, soilIndex),
             )
+
+    @classmethod
+    async def _updateUserSoil(cls, uid: str, soilIndex: int, field: str, value):
+        """更新指定用户土地的单个字段
+
+        Args:
+            uid (str): 用户ID
+            soilIndex (int): 土地索引
+            field (str): 需更新的字段名
+            value: 新值
+
+        Returns:
+            None
+        """
+        await cls.m_pDB.execute(
+            f"UPDATE userSoil SET {field} = ? WHERE uid = ? AND soilIndex = ?",
+            (value, uid, soilIndex),
+        )
 
     @classmethod
     async def deleteUserSoil(cls, uid: str, soilIndex: int):
@@ -189,9 +242,23 @@ class CUserSoilDB(CSqlManager):
         """
         async with cls._transaction():
             await cls.m_pDB.execute(
-                "DELETE FROM userSoil WHERE uid = ? AND soilIndex = ?",
-                (uid, soilIndex)
+                "DELETE FROM userSoil WHERE uid = ? AND soilIndex = ?", (uid, soilIndex)
             )
+
+    @classmethod
+    async def _deleteUserSoil(cls, uid: str, soilIndex: int):
+        """删除指定用户的土地记录
+
+        Args:
+            uid (str): 用户ID
+            soilIndex (int): 土地索引
+
+        Returns:
+            None
+        """
+        await cls.m_pDB.execute(
+            "DELETE FROM userSoil WHERE uid = ? AND soilIndex = ?", (uid, soilIndex)
+        )
 
     @classmethod
     async def isSoilPlanted(cls, uid: str, soilIndex: int) -> bool:
@@ -240,22 +307,24 @@ class CUserSoilDB(CSqlManager):
             async with cls._transaction():
                 # 复用原有记录字段，保留土壤状态等信息
                 prev = soilRecord or {}
-                await cls.deleteUserSoil(uid, soilIndex)
-                await cls.insertUserSoil({
-                    "uid": uid,
-                    "soilIndex": soilIndex,
-                    "plantName": plantName,
-                    "plantTime": nowTs,
-                    "matureTime": matureTs,
-                    # 保留之前的土壤等级和状态字段，避免数据丢失
-                    "soilLevel": prev.get("soilLevel", 0),
-                    "wiltStatus": prev.get("wiltStatus", 0),
-                    "fertilizerStatus": prev.get("fertilizerStatus", 0),
-                    "bugStatus": prev.get("bugStatus", 0),
-                    "weedStatus": prev.get("weedStatus", 0),
-                    "waterStatus": prev.get("waterStatus", 0)
-                })
+                await cls._deleteUserSoil(uid, soilIndex)
+                await cls._insertUserSoil(
+                    {
+                        "uid": uid,
+                        "soilIndex": soilIndex,
+                        "plantName": plantName,
+                        "plantTime": nowTs,
+                        "matureTime": matureTs,
+                        # 保留之前的土壤等级和状态字段，避免数据丢失
+                        "soilLevel": prev.get("soilLevel", 0),
+                        "wiltStatus": prev.get("wiltStatus", 0),
+                        "fertilizerStatus": prev.get("fertilizerStatus", 0),
+                        "bugStatus": prev.get("bugStatus", 0),
+                        "weedStatus": prev.get("weedStatus", 0),
+                        "waterStatus": prev.get("waterStatus", 0),
+                    }
+                )
             return True
         except Exception as e:
-            logger.error(f"真寻农场播种失败！", e=e)
+            logger.error(f"播种失败！", e=e)
             return False

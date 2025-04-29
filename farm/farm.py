@@ -389,7 +389,7 @@ class CFarmManager:
                     number = plantInfo['harvest']
 
                     #处理偷菜扣除数量
-                    stealNum = g_pDBService.userSteal.getTotalStolenCount(uid, i)
+                    stealNum = await g_pDBService.userSteal.getTotalStolenCount(uid, i)
 
                     number -= stealNum
 

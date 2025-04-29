@@ -1,8 +1,8 @@
 from typing import Optional
 
-from database import CSqlManager
-
 from zhenxun.services.log import logger
+
+from .database import CSqlManager
 
 
 class CUserItemDB(CSqlManager):
@@ -41,7 +41,7 @@ class CUserItemDB(CSqlManager):
                 row = await cursor.fetchone()
                 return row[0] if row else None
         except Exception as e:
-            logger.warning(f"真寻农场getUserItemByName查询失败！", e=e)
+            logger.warning(f"getUserItemByName查询失败！", e=e)
             return None
 
     @classmethod
@@ -64,7 +64,7 @@ class CUserItemDB(CSqlManager):
             rows = await cursor.fetchall()
             return {row["item"]: row["count"] for row in rows}
         except Exception as e:
-            logger.warning(f"真寻农场getUserItemByUid查询失败！", e=e)
+            logger.warning(f"getUserItemByUid查询失败！", e=e)
             return {}
 
     @classmethod
@@ -88,7 +88,7 @@ class CUserItemDB(CSqlManager):
                 )
             return True
         except Exception as e:
-            logger.warning(f"真寻农场deleteUserItemByName失败！", e=e)
+            logger.warning(f"deleteUserItemByName失败！", e=e)
             return False
 
     @classmethod
@@ -119,7 +119,7 @@ class CUserItemDB(CSqlManager):
                     )
             return True
         except Exception as e:
-            logger.warning(f"真寻农场updateUserItemByName失败！", e=e)
+            logger.warning(f"updateUserItemByName失败！", e=e)
             return False
 
     @classmethod
@@ -164,5 +164,5 @@ class CUserItemDB(CSqlManager):
                         )
             return True
         except Exception as e:
-            logger.warning(f"真寻农场addUserItemByUid失败！", e=e)
+            logger.warning(f"addUserItemByUid失败！", e=e)
             return False

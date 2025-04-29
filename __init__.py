@@ -7,7 +7,8 @@ from zhenxun.utils.message import MessageUtils
 
 from .command import diuse_farm, diuse_register, reclamation
 from .config import g_pJsonManager
-from .database import g_pSqlManager
+from .database.database import g_pSqlManager
+from .dbService import g_pDBService
 from .farm.farm import g_pFarmManager
 from .farm.shop import g_pShopManager
 from .request import g_pRequestManager
@@ -36,7 +37,7 @@ __plugin_meta__ = PluginMetadata(
     """.strip(),
     extra=PluginExtraData(
         author="Art_Sakura",
-        version="1.1",
+        version="1.2",
         commands=[Command(command="我的农场")],
         menu_type="群内小游戏",
         configs=[
@@ -78,6 +79,8 @@ async def start():
 
     # 初始化读取Json
     await g_pJsonManager.init()
+
+    await g_pDBService.init()
 
 # 析构函数
 @driver.on_shutdown

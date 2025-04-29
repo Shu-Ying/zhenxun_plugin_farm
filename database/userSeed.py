@@ -1,8 +1,8 @@
 from typing import Optional
 
-from database import CSqlManager
-
 from zhenxun.services.log import logger
+
+from .database import CSqlManager
 
 
 class CUserSeedDB(CSqlManager):
@@ -22,7 +22,7 @@ class CUserSeedDB(CSqlManager):
 
     @classmethod
     async def addUserSeedByUid(cls, uid: str, seed: str, count: int = 1) -> bool:
-        """根据用户uid添加种子信息
+        """根据用户uid添加种子信息（事务版本）
 
         Args:
             uid (str): 用户uid
@@ -34,7 +34,6 @@ class CUserSeedDB(CSqlManager):
         """
         try:
             async with cls._transaction():
-                #检查是否已存在该种子
                 async with cls.m_pDB.execute(
                     "SELECT count FROM userSeed WHERE uid = ? AND seed = ?",
                     (uid, seed)
@@ -42,21 +41,18 @@ class CUserSeedDB(CSqlManager):
                     row = await cursor.fetchone()
 
                 if row:
-                    #如果种子已存在，则更新数量
                     newCount = row[0] + count
                     await cls.m_pDB.execute(
                         "UPDATE userSeed SET count = ? WHERE uid = ? AND seed = ?",
                         (newCount, uid, seed)
                     )
                 else:
-                    #如果种子不存在，则插入新记录
                     newCount = count
                     await cls.m_pDB.execute(
                         "INSERT INTO userSeed (uid, seed, count) VALUES (?, ?, ?)",
                         (uid, seed, count)
                     )
 
-                #如果种子数量为 0，删除记录
                 if newCount <= 0:
                     await cls.m_pDB.execute(
                         "DELETE FROM userSeed WHERE uid = ? AND seed = ?",
@@ -64,8 +60,32 @@ class CUserSeedDB(CSqlManager):
                     )
             return True
         except Exception as e:
-            logger.warning(f"真寻农场addUserSeedByUid 失败！", e=e)
+            logger.warning(f"addUserSeedByUid 失败！", e=e)
             return False
+
+    @classmethod
+    async def _addUserSeedByUid(cls, uid: str, seed: str, count: int = 1) -> bool:
+        """根据用户uid添加种子信息（非事务版，复用其他非事务接口）"""
+        try:
+            existing = await cls.getUserSeedByName(uid, seed)
+            newCount = (existing or 0) + count
+
+            if existing is not None:
+                await cls._updateUserSeedByName(uid, seed, newCount)
+            else:
+                await cls.m_pDB.execute(
+                    "INSERT INTO userSeed (uid, seed, count) VALUES (?, ?, ?)",
+                    (uid, seed, newCount)
+                )
+
+            if newCount <= 0:
+                await cls._deleteUserSeedByName(uid, seed)
+
+            return True
+        except Exception as e:
+            logger.warning(f"_addUserSeedByUid 失败！", e=e)
+            return False
+
 
     @classmethod
     async def getUserSeedByName(cls, uid: str, seed: str) -> Optional[int]:
@@ -87,7 +107,7 @@ class CUserSeedDB(CSqlManager):
                 row = await cursor.fetchone()
                 return row[0] if row else None
         except Exception as e:
-            logger.warning(f"真寻农场getUserSeedByName 查询失败！", e=e)
+            logger.warning(f"getUserSeedByName 查询失败！", e=e)
             return None
 
     @classmethod
@@ -131,7 +151,33 @@ class CUserSeedDB(CSqlManager):
                 )
             return True
         except Exception as e:
-            logger.warning(f"真寻农场updateUserSeedByName失败！", e=e)
+            logger.warning(f"updateUserSeedByName失败！", e=e)
+            return False
+
+    @classmethod
+    async def _updateUserSeedByName(cls, uid: str, seed: str, count: int) -> bool:
+        """根据种子名称更新种子数量
+
+        Args:
+            uid (str): 用户uid
+            seed (str): 种子名称
+            count (int): 种子数量
+
+        Returns:
+            bool: 是否成功
+        """
+        try:
+            if count <= 0:
+                return await cls.deleteUserSeedByName(uid, seed)
+
+            async with cls._transaction():
+                await cls.m_pDB.execute(
+                    "UPDATE userSeed SET count = ? WHERE uid = ? AND seed = ?",
+                    (count, uid, seed)
+                )
+            return True
+        except Exception as e:
+            logger.warning(f"updateUserSeedByName失败！", e=e)
             return False
 
     @classmethod
@@ -153,5 +199,26 @@ class CUserSeedDB(CSqlManager):
                 )
             return True
         except Exception as e:
-            logger.warning(f"真寻农场deleteUserSeedByName 删除失败！", e=e)
+            logger.warning(f"deleteUserSeedByName 删除失败！", e=e)
+            return False
+
+    @classmethod
+    async def _deleteUserSeedByName(cls, uid: str, seed: str) -> bool:
+        """根据种子名称从种子仓库中删除种子
+
+        Args:
+            uid (str): 用户uid
+            seed (str): 种子名称
+
+        Returns:
+            bool: 是否成功
+        """
+        try:
+            await cls.m_pDB.execute(
+                "DELETE FROM userSeed WHERE uid = ? AND seed = ?",
+                (uid, seed)
+            )
+            return True
+        except Exception as e:
+            logger.warning(f"deleteUserSeedByName 删除失败！", e=e)
             return False

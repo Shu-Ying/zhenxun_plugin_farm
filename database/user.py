@@ -1,9 +1,10 @@
+import math
 from datetime import date, datetime, timedelta
 from typing import List, Union
 
-from database import CSqlManager
-
 from zhenxun.services.log import logger
+
+from .database import CSqlManager
 
 
 class CUserDB(CSqlManager):
@@ -64,6 +65,28 @@ class CUserDB(CSqlManager):
         cursor = await cls.m_pDB.execute("SELECT uid FROM user")
         rows = await cursor.fetchall()
         return [row[0] for row in rows]
+
+    @classmethod
+    async def isUserExist(cls, uid: str) -> bool:
+        """判断用户是否存在
+
+        Args:
+            uid (str): 用户Uid
+
+        Returns:
+            bool: 如果用户存在返回True，否则返回False
+        """
+        if not uid:
+            return False
+        try:
+            async with cls.m_pDB.execute(
+                "SELECT 1 FROM user WHERE uid = ?", (uid,)
+            ) as cursor:
+                row = await cursor.fetchone()
+                return row is not None
+        except Exception as e:
+            logger.warning("isUserExist 查询失败！", e=e)
+            return False
 
     @classmethod
     async def getUserInfoByUid(cls, uid: str) -> dict:
@@ -240,22 +263,37 @@ class CUserDB(CSqlManager):
             uid (str): 用户Uid
 
         Returns:
-            tuple[int, int, int]: (当前等级, 下级所需经验, 当前等级剩余经验)，失败返回(-1, -1, -1)
+            tuple[int, int, int]: (当前等级, 升至下级还需经验, 当前等级已获经验)，失败返回(-1, -1, -1)
         """
         if not uid:
             return -1, -1, -1
+
         try:
             async with cls.m_pDB.execute(
                 "SELECT exp FROM user WHERE uid = ?", (uid,)
             ) as cursor:
                 row = await cursor.fetchone()
-                if row and row[0] is not None:
-                    expVal = int(row[0])
-                    level = expVal // 200
-                    nextLevelExp = 200 * (level + 1)
-                    currentLevelExp = level * 200
-                    remainingExp = expVal - currentLevelExp
-                    return level, nextLevelExp, remainingExp
+                if not row or row[0] is None:
+                    return -1, -1, -1
+
+                expVal = int(row[0])
+                levelStep = 200  # 每级经验增量
+
+                discriminant = 1 + 8 * expVal / levelStep
+                level = int((-1 + math.sqrt(discriminant)) // 2)
+                if level < 0:
+                    level = 0
+
+                def cumExp(k: int) -> int:
+                    return levelStep * k * (k + 1) // 2
+
+                totalExpCurrentLevel = cumExp(level)
+                totalExpNextLevel = cumExp(level + 1)
+
+                currentExp = expVal - totalExpCurrentLevel
+
+                return level, totalExpNextLevel, currentExp
+
             return -1, -1, -1
         except Exception as e:
             logger.warning("getUserLevelByUid 查询失败！", e=e)
