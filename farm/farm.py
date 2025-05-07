@@ -13,9 +13,10 @@ from zhenxun.utils.enum import GoldHandle
 from zhenxun.utils.image_utils import ImageTemplate
 from zhenxun.utils.platform import PlatformUtils
 
-from ..config import g_pJsonManager, g_sResourcePath
+from ..config import g_sResourcePath
 from ..dbService import g_pDBService
 from ..event.event import g_pEventManager
+from ..json import g_pJsonManager
 
 
 class CFarmManager:

@@ -3,8 +3,8 @@ from typing import Optional
 
 from zhenxun.services.log import logger
 
-from ..config import g_pJsonManager
 from ..dbService import g_pDBService
+from ..json import g_pJsonManager
 from .database import CSqlManager
 
 

@@ -6,11 +6,11 @@ from zhenxun.services.log import logger
 from zhenxun.utils.message import MessageUtils
 
 from .command import diuse_farm, diuse_register, reclamation
-from .config import g_pJsonManager
 from .database.database import g_pSqlManager
 from .dbService import g_pDBService
 from .farm.farm import g_pFarmManager
 from .farm.shop import g_pShopManager
+from .json import g_pJsonManager
 from .request import g_pRequestManager
 
 __plugin_meta__ = PluginMetadata(

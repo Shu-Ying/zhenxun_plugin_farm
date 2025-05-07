@@ -1,12 +1,12 @@
 import math
-from re import I
 
 from zhenxun.services.log import logger
 from zhenxun.utils._build_image import BuildImage
 from zhenxun.utils.image_utils import ImageTemplate
 
-from ..config import g_pJsonManager, g_sResourcePath
+from ..config import g_sResourcePath
 from ..dbService import g_pDBService
+from ..json import g_pJsonManager
 
 
 class CShopManager:
