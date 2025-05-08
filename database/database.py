@@ -12,21 +12,26 @@ from ..config import g_sDBFilePath, g_sDBPath
 
 class CSqlManager:
     def __init__(self):
-        g_sDBPath.mkdir(parents=True, exist_ok=True)
+        try:
+            os.mkdir(g_sDBFilePath)
+        except FileExistsError:
+            pass
 
     @classmethod
     async def cleanup(cls):
-        if cls.m_pDB:
+        if hasattr(cls, "m_pDB") and cls.m_pDB:
             await cls.m_pDB.close()
 
     @classmethod
     async def init(cls) -> bool:
-        bIsExist = os.path.exists(g_sDBFilePath)
-
-        cls.m_pDB = await aiosqlite.connect(g_sDBFilePath)
-        cls.m_pDB.row_factory = aiosqlite.Row
-
-        return True
+        try:
+            _ = os.path.exists(g_sDBFilePath)
+            cls.m_pDB = await aiosqlite.connect(str(g_sDBFilePath))
+            cls.m_pDB.row_factory = aiosqlite.Row
+            return True
+        except Exception as e:
+            logger.warning("初始化总数据库失败", e=e)
+            return False
 
     @classmethod
     @asynccontextmanager
@@ -115,7 +120,7 @@ class CSqlManager:
         Returns:
             bool: 是否执行成功
         """
-        if len(command) <= 0:
+        if not command:
             logger.warning("数据库语句长度为空！")
             return False
 
@@ -124,7 +129,7 @@ class CSqlManager:
                 await cls.m_pDB.execute(command)
             return True
         except Exception as e:
-            logger.warning("数据库语句执行出错:" + command, e=e)
+            logger.warning(f"数据库语句执行出错: {command}", e=e)
             return False
 
 g_pSqlManager = CSqlManager()

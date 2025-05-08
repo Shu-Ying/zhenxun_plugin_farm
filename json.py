@@ -7,15 +7,11 @@ from zhenxun.services.log import logger
 class CJsonManager:
     def __init__(self):
         self.m_pItem = {}
-        self.m_pPlant = {}
         self.m_pLevel = {}
         self.m_pSoil = {}
 
     async def init(self) -> bool:
         if not await self.initItem():
-            return False
-
-        if not await self.initPlant():
             return False
 
         if not await self.initLevel():
@@ -42,24 +38,6 @@ class CJsonManager:
             return False
         except json.JSONDecodeError as e:
             logger.warning(f"item.json JSON格式错误: {e}")
-            return False
-
-    async def initPlant(self) -> bool:
-        current_file_path = Path(__file__)
-
-        try:
-            with open(
-                current_file_path.resolve().parent / "config/plant.json",
-                encoding="utf-8",
-            ) as file:
-                self.m_pPlant = json.load(file)
-
-                return True
-        except FileNotFoundError:
-            logger.warning("plant.json 打开失败")
-            return False
-        except json.JSONDecodeError as e:
-            logger.warning(f"plant.json JSON格式错误: {e}")
             return False
 
     async def initLevel(self) -> bool:

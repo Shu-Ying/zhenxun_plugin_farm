@@ -86,3 +86,5 @@ async def start():
 @driver.on_shutdown
 async def shutdown():
     await g_pSqlManager.cleanup()
+
+    await g_pDBService.cleanup()

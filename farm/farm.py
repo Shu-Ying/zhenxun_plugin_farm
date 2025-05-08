@@ -195,7 +195,10 @@ class CFarmManager:
             return True, plant, False
 
         #获取作物详细信息
-        plantInfo = g_pJsonManager.m_pPlant['plant'][soilInfo['plantName']]
+        plantInfo = await g_pDBService.plant.getPlantByName(soilInfo['plantName'])
+        if not plantInfo:
+            logger.error(f"绘制植物资源失败: {soilInfo['plantName']}")
+            return False, None, False #type: ignore
 
         currentTime = datetime.now()
         matureTime = datetime.fromtimestamp(int(soilInfo['matureTime']))
@@ -257,7 +260,10 @@ class CFarmManager:
 
         for seedName, count in seedRecords.items():
             try:
-                plantInfo = g_pJsonManager.m_pPlant['plant'][seedName]
+                plantInfo = await g_pDBService.plant.getPlantByName(seedName)
+                if not plantInfo:
+                    continue
+
                 iconPath = g_sResourcePath / f"plant/{seedName}/icon.png"
                 icon = (iconPath, 33, 33) if iconPath.exists() else ""
                 sellable = "可以" if plantInfo['again'] else "不可以"
@@ -382,7 +388,10 @@ class CFarmManager:
                 if soilInfo.get("wiltStatus", 1) == 1:
                     continue
 
-                plantInfo = g_pJsonManager.m_pPlant.get("plant", {}).get(soilInfo['plantName'])
+                plantInfo = await g_pDBService.plant.getPlantByName(soilInfo['plantName'])
+                if not plantInfo:
+                    continue
+
                 currentTime = datetime.now()
                 matureTime = datetime.fromtimestamp(int(soilInfo['matureTime']))
 
@@ -497,7 +506,10 @@ class CFarmManager:
 
         sell = ""
         for name, count in plant.items():
-            plantInfo = g_pJsonManager.m_pPlant['plant'][name]
+            plantInfo = await g_pDBService.plant.getPlantByName(name)
+            if not plantInfo:
+                continue
+
             icon = ""
             icon_path = g_sResourcePath / f"plant/{name}/icon.png"
             if icon_path.exists():
@@ -577,7 +589,10 @@ class CFarmManager:
                 continue
 
             #作物信息
-            plantInfo = g_pJsonManager.m_pPlant.get("plant", {}).get(soilInfo['plantName'])
+            plantInfo = await g_pDBService.plant.getPlantByName(soilInfo['plantName'])
+            if not plantInfo:
+                continue
+
             currentTime = datetime.now()
             matureTime = datetime.fromtimestamp(int(soilInfo['matureTime']))
 

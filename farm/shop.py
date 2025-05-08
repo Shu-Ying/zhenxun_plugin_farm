@@ -1,4 +1,6 @@
 import math
+import plistlib
+from itertools import islice
 
 from zhenxun.services.log import logger
 from zhenxun.utils._build_image import BuildImage
@@ -35,14 +37,18 @@ class CShopManager:
         ]
 
         sell = ""
-        plants = list(g_pJsonManager.m_pPlant['plant'].items())
-        start = (num - 1) * 15
-        maxItems = min(len(plants) - start, 15)
-        items = plants[start:start + maxItems]
+        plants = await g_pDBService.plant.listPlants()
+        plantSize = await g_pDBService.plant.countPlants(True)
 
-        for key, plant in items:
+        start = (num - 1) * 15
+        items = islice(plants, start, start + 15)
+
+        for plant in items:
+            if plant['isBuy'] == 0:
+                continue
+
             icon = ""
-            icon_path = g_sResourcePath / f"plant/{key}/icon.png"
+            icon_path = g_sResourcePath / f"plant/{plant['name']}/icon.png"
             if icon_path.exists():
                 icon = (icon_path, 33, 33)
 
@@ -54,7 +60,7 @@ class CShopManager:
             data_list.append(
                 [
                     icon,
-                    key,
+                    plant['name'],
                     plant['buy'],
                     plant['level'],
                     plant['price'],
@@ -67,7 +73,7 @@ class CShopManager:
                 ]
             )
 
-        count = math.ceil(len(g_pJsonManager.m_pPlant['plant']) / 15)
+        count = math.ceil(plantSize / 15)
         title = f"种子商店 页数: {num}/{count}"
 
         result = await ImageTemplate.table_page(
@@ -95,11 +101,8 @@ class CShopManager:
         if num <= 0:
             return "请输入购买数量！"
 
-        plantInfo = None
-
-        try:
-            plantInfo = g_pJsonManager.m_pPlant['plant'][name]
-        except Exception as e:
+        plantInfo = await g_pDBService.plant.getPlantByName(name)
+        if not plantInfo:
             return "购买出错！请检查需购买的种子名称！"
 
         level = await g_pDBService.user.getUserLevelByUid(uid)
@@ -145,7 +148,10 @@ class CShopManager:
 
         if name == "":
             for plantName, count in plant.items():
-                plantInfo = g_pJsonManager.m_pPlant['plant'][plantName]
+                plantInfo = await g_pDBService.plant.getPlantByName(plantName)
+                if not plantInfo:
+                    continue
+
                 point += plantInfo['price'] * count
                 await g_pDBService.userPlant.updateUserPlantByName(uid, plantName, 0)
         else:
@@ -158,7 +164,17 @@ class CShopManager:
             await g_pDBService.userPlant.updateUserPlantByName(uid, name, available - sellAmount)
             totalSold = sellAmount
 
-        totalPoint = point if name == "" else totalSold * g_pJsonManager.m_pPlant['plant'][name]['price']
+        if name == "":
+            totalPoint = point
+        else:
+            plantInfo = await g_pDBService.plant.getPlantByName(name)
+            if not plantInfo:
+                price = 0
+            else:
+                price = plantInfo['price']
+
+            totalPoint = totalSold * price
+
         currentPoint = await g_pDBService.user.getUserPointByUid(uid)
         await g_pDBService.user.updateUserPointByUid(uid, currentPoint + totalPoint)
 

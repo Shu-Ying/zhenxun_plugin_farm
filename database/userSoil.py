@@ -295,7 +295,7 @@ class CUserSoilDB(CSqlManager):
             return False
 
         # 获取植物配置
-        plantCfg = g_pJsonManager.m_pPlant.get("plant", {}).get(plantName)
+        plantCfg = await g_pDBService.plant.getPlantByName(plantName)
         if not plantCfg:
             logger.error(f"未知植物: {plantName}")
             return False
