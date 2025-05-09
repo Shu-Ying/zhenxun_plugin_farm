@@ -210,6 +210,12 @@ class CFarmManager:
 
             return True, plant, True
         else:
+            #如果是多阶段作物 且没有成熟
+            if soilInfo['harvestCount'] >= 1:
+                plant = BuildImage(background = g_sResourcePath / f"plant/{soilInfo['plantName']}/{plantInfo['phase'] - 2}.png")
+
+                return True, plant, False
+
             #如果没有成熟 则根据当前阶段进行绘制
             plantedTime = datetime.fromtimestamp(int(soilInfo['plantTime']))
 
@@ -412,7 +418,16 @@ class CFarmManager:
                     harvestRecords.append(f"收获作物：{soilInfo['plantName']}，数量为：{number}，经验为：{plantInfo['experience']}")
 
                     await g_pDBService.userPlant.addUserPlantByUid(uid, soilInfo['plantName'], number)
-                    await g_pDBService.userSoil.updateUserSoil(uid, i, "wiltStatus", 1)
+
+                    #如果到达收获次数上限
+                    if soilInfo['harvestCount'] + 1 >= plantInfo['crop']:
+                        await g_pDBService.userSoil.updateUserSoil(uid, i, "wiltStatus", 1)
+                    else:
+                        matureTs = int(currentTime.timestamp()) + int(plantInfo.get("again", 0)) * 3600
+
+                        await g_pDBService.userSoil.updateUserSoil(uid, i, "harvestCount", soilInfo['harvestCount'] + 1)
+                        await g_pDBService.userSoil.updateUserSoil(uid, i, "lastResetTime", int(currentTime.timestamp()))
+                        await g_pDBService.userSoil.updateUserSoil(uid, i, "matureTime", matureTs)
 
                     await g_pEventManager.m_afterHarvest.emit(uid=uid, name=soilInfo['plantName'], num=number, soilIndex=i)
 
@@ -462,6 +477,9 @@ class CFarmManager:
 
                 #批量更新数据库操作
                 await g_pDBService.userSoil.deleteUserSoil(uid, i)
+
+                #铲除作物会将偷菜记录清空
+                await g_pDBService.userSteal.deleteStealRecord(uid, i)
 
                 await g_pEventManager.m_afterEradicate.emit(uid=uid, soilIndex=i)
 
@@ -614,7 +632,18 @@ class CFarmManager:
 
                     #如果将作物偷完，就直接更新状态 并记录用户偷取过
                     if plantInfo['harvest'] - randomNumber + stealingNumber == 0:
-                        await g_pDBService.userSoil.updateUserSoil(target, i, "wiltStatus", 1)
+                        #如果作物 是最后一阶段作物且偷完 则直接枯萎
+                        if soilInfo['harvestCount'] + 1 >= plantInfo['crop']:
+                            await g_pDBService.userSoil.updateUserSoil(target, i, "wiltStatus", 1)
+                        else:
+                            matureTs = int(currentTime.timestamp()) + int(plantInfo.get("again", 0)) * 3600
+
+                            await g_pDBService.userSoil.updateUserSoil(uid, i, "harvestCount", soilInfo['harvestCount'] + 1)
+                            await g_pDBService.userSoil.updateUserSoil(uid, i, "lastResetTime", int(currentTime.timestamp()))
+                            await g_pDBService.userSoil.updateUserSoil(uid, i, "matureTime", matureTs)
+
+                            await g_pDBService.userSteal.addStealRecord(target, i, uid, randomNumber, int(datetime.now().timestamp()))
+
                     else:
                         await g_pDBService.userSteal.addStealRecord(target, i, uid, randomNumber, int(datetime.now().timestamp()))
 

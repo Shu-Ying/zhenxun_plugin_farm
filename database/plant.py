@@ -135,7 +135,7 @@ class CPlantManager:
     async def listPlants(cls) -> list[dict]:
         """查询所有作物记录"""
         try:
-            async with cls.m_pDB.execute("SELECT * FROM plant") as cursor:
+            async with cls.m_pDB.execute("SELECT * FROM plant ORDER BY level") as cursor:
                 rows = await cursor.fetchall()
                 return [dict(r) for r in rows]
         except Exception as e:

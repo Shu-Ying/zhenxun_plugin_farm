@@ -6,11 +6,11 @@ from .database import CSqlManager
 class CUserStealDB(CSqlManager):
     @classmethod
     async def initDB(cls):
-        # 被偷用户Uid
-        # 被偷的地块索引 从1开始
-        # 偷菜用户Uid
-        # 被偷数量
-        # 被偷时间
+        #uid:           被偷用户Uid
+        #soilIndex:     被偷的地块索引 从1开始
+        #stealerUid:    偷菜用户Uid
+        #stealCount:    被偷数量
+        #stealTime:     被偷时间
         userSteal = {
             "uid": "TEXT NOT NULL",
             "soilIndex": "INTEGER NOT NULL",
@@ -205,13 +205,12 @@ class CUserStealDB(CSqlManager):
             return False
 
     @classmethod
-    async def deleteStealRecord(cls, uid: str, soilIndex: int, stealerUid: str) -> bool:
-        """删除指定偷菜记录
+    async def deleteStealRecord(cls, uid: str, soilIndex: int) -> bool:
+        """删除指定偷菜记录（只需被偷用户Uid和地块索引）
 
         Args:
             uid (str): 被偷用户Uid
             soilIndex (int): 被偷地块索引
-            stealerUid (str): 偷菜用户Uid
 
         Returns:
             bool: 删除是否成功
@@ -219,8 +218,8 @@ class CUserStealDB(CSqlManager):
         try:
             async with cls._transaction():
                 await cls.m_pDB.execute(
-                    'DELETE FROM "userSteal" WHERE uid=? AND soilIndex=? AND stealerUid=?;',
-                    (uid, soilIndex, stealerUid)
+                    'DELETE FROM "userSteal" WHERE uid=? AND soilIndex=?;',
+                    (uid, soilIndex)
                 )
             return True
         except Exception as e:

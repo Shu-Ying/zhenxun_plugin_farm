@@ -11,17 +11,18 @@ from .database import CSqlManager
 class CUserSoilDB(CSqlManager):
     @classmethod
     async def initDB(cls):
-        # 用户Uid
-        # 地块索引从1开始
-        # 作物名称
-        # 播种时间
-        # 成熟时间
-        # 土地等级 0=普通地，1=红土地，2=黑土地，3=金土地
-        # 枯萎状态 0=未枯萎，1=枯萎
-        # 施肥状态 0=未施肥，1=施肥
-        # 虫害状态 0=无虫害，1=有虫害
-        # 杂草状态 0=无杂草，1=有杂草
-        # 缺水状态 0=不缺水，1=缺水
+        #uid: 用户Uid
+        #soilIndex:         地块索引从1开始
+        #plantName:         作物名称
+        #plantTime:         播种时间
+        #matureTime:        成熟时间
+        #soilLevel:         土地等级 0=普通地，1=红土地，2=黑土地，3=金土地
+        #wiltStatus:        枯萎状态 0=未枯萎，1=枯萎
+        #fertilizerStatus:  施肥状态 0=未施肥，1=施肥
+        #bugStatus:         虫害状态 0=无虫害，1=有虫害
+        #weedStatus:        杂草状态 0=无杂草，1=有杂草
+        #waterStatus:       缺水状态 0=不缺水，1=缺水
+        #harvestCount:      收获次数
         userSoil = {
             "uid": "TEXT NOT NULL",
             "soilIndex": "INTEGER NOT NULL",
@@ -34,6 +35,7 @@ class CUserSoilDB(CSqlManager):
             "bugStatus": "INTEGER DEFAULT 0",
             "weedStatus": "INTEGER DEFAULT 0",
             "waterStatus": "INTEGER DEFAULT 0",
+            "harvestCount": "INTEGER DEFAULT 0",
             "PRIMARY KEY": "(uid, soilIndex)",
         }
 
@@ -64,7 +66,7 @@ class CUserSoilDB(CSqlManager):
         Returns:
             bool: 如果旧表不存在则返回 False，否则迁移并删除后返回 True
         """
-        # 检查旧表是否存在
+        #检查旧表是否存在
         cursor = await cls.m_pDB.execute(
             "SELECT name FROM sqlite_master WHERE type='table' AND name='soil'"
         )
@@ -89,8 +91,12 @@ class CUserSoilDB(CSqlManager):
                     mt = int(parts[2])
 
                     await cls.m_pDB.execute(
-                        "INSERT INTO userSoil (uid,soilIndex,plantName,plantTime,matureTime) VALUES (?,?,?,?,?)",
-                        (uid, i, name, pt, mt),
+                        """
+                        INSERT INTO userSoil
+                        (uid,soilIndex,plantName,plantTime,matureTime,harvestCount,)
+                        VALUES (?,?,?,?,?,?)
+                        """,
+                        (uid, i, name, pt, mt, 0),
                     )
 
             await cls.m_pDB.execute("DROP TABLE soil")
@@ -108,7 +114,13 @@ class CUserSoilDB(CSqlManager):
         """
         async with cls._transaction():
             await cls.m_pDB.execute(
-                "INSERT INTO userSoil (uid, soilIndex, plantName, plantTime, matureTime, soilLevel, fertilizerStatus, bugStatus, weedStatus, waterStatus) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                """
+                INSERT INTO userSoil
+                  (uid, soilIndex, plantName, plantTime, matureTime,
+                   soilLevel, wiltStatus, fertilizerStatus, bugStatus,
+                   weedStatus, waterStatus, harvestCount)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
+                """,
                 (
                     soilInfo["uid"],
                     soilInfo["soilIndex"],
@@ -116,10 +128,12 @@ class CUserSoilDB(CSqlManager):
                     soilInfo.get("plantTime", 0),
                     soilInfo.get("matureTime", 0),
                     soilInfo.get("soilLevel", 0),
+                    soilInfo.get("wiltStatus", 0),
                     soilInfo.get("fertilizerStatus", 0),
                     soilInfo.get("bugStatus", 0),
                     soilInfo.get("weedStatus", 0),
                     soilInfo.get("waterStatus", 0),
+                    soilInfo.get("harvestCount", 0),
                 ),
             )
 
@@ -134,19 +148,27 @@ class CUserSoilDB(CSqlManager):
             None
         """
         await cls.m_pDB.execute(
-            "INSERT INTO userSoil (uid, soilIndex, plantName, plantTime, matureTime, soilLevel, fertilizerStatus, bugStatus, weedStatus, waterStatus) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            (
-                soilInfo["uid"],
-                soilInfo["soilIndex"],
-                soilInfo.get("plantName", ""),
-                soilInfo.get("plantTime", 0),
-                soilInfo.get("matureTime", 0),
-                soilInfo.get("soilLevel", 0),
-                soilInfo.get("fertilizerStatus", 0),
-                soilInfo.get("bugStatus", 0),
-                soilInfo.get("weedStatus", 0),
-                soilInfo.get("waterStatus", 0),
-            ),
+                """
+                INSERT INTO userSoil
+                  (uid, soilIndex, plantName, plantTime, matureTime,
+                   soilLevel, wiltStatus, fertilizerStatus, bugStatus,
+                   weedStatus, waterStatus, harvestCount)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
+                """,
+                (
+                    soilInfo["uid"],
+                    soilInfo["soilIndex"],
+                    soilInfo.get("plantName", ""),
+                    soilInfo.get("plantTime", 0),
+                    soilInfo.get("matureTime", 0),
+                    soilInfo.get("soilLevel", 0),
+                    soilInfo.get("wiltStatus", 0),
+                    soilInfo.get("fertilizerStatus", 0),
+                    soilInfo.get("bugStatus", 0),
+                    soilInfo.get("weedStatus", 0),
+                    soilInfo.get("waterStatus", 0),
+                    soilInfo.get("harvestCount", 0),
+                ),
         )
 
     @classmethod
@@ -289,12 +311,12 @@ class CUserSoilDB(CSqlManager):
         Returns:
             bool: 播种成功返回 True，否则返回 False
         """
-        # 校验土地区是否已种植
+        #校验土地区是否已种植
         soilRecord = await cls.getUserSoil(uid, soilIndex)
         if soilRecord and soilRecord.get("plantName"):
             return False
 
-        # 获取植物配置
+        #获取植物配置
         plantCfg = await g_pDBService.plant.getPlantByName(plantName)
         if not plantCfg:
             logger.error(f"未知植物: {plantName}")
@@ -305,7 +327,6 @@ class CUserSoilDB(CSqlManager):
 
         try:
             async with cls._transaction():
-                # 复用原有记录字段，保留土壤状态等信息
                 prev = soilRecord or {}
                 await cls._deleteUserSoil(uid, soilIndex)
                 await cls._insertUserSoil(
@@ -315,13 +336,13 @@ class CUserSoilDB(CSqlManager):
                         "plantName": plantName,
                         "plantTime": nowTs,
                         "matureTime": matureTs,
-                        # 保留之前的土壤等级和状态字段，避免数据丢失
                         "soilLevel": prev.get("soilLevel", 0),
                         "wiltStatus": prev.get("wiltStatus", 0),
                         "fertilizerStatus": prev.get("fertilizerStatus", 0),
                         "bugStatus": prev.get("bugStatus", 0),
                         "weedStatus": prev.get("weedStatus", 0),
                         "waterStatus": prev.get("waterStatus", 0),
+                        "harvestCount": 0
                     }
                 )
             return True

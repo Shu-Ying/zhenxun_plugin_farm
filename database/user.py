@@ -11,13 +11,13 @@ class CUserDB(CSqlManager):
     @classmethod
     async def initDB(cls):
         """初始化用户表结构，确保user表存在且字段完整"""
-        # 用户Uid
-        # 农场名称
-        # 经验值
-        # 金币
-        # 解锁土地数量
-        # 偷菜时间字符串
-        # 剩余偷菜次数
+        #uid:           用户Uid
+        #name:          农场名称
+        #exp:           经验值
+        #point:         金币
+        #soil:          解锁土地数量
+        #stealTime:     偷菜时间字符串
+        #stealCount:    剩余偷菜次数
         userInfo = {
             "uid": "INTEGER PRIMARY KEY AUTOINCREMENT",
             "name": "TEXT NOT NULL",
