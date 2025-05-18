@@ -37,7 +37,7 @@ __plugin_meta__ = PluginMetadata(
     """.strip(),
     extra=PluginExtraData(
         author="Art_Sakura",
-        version="1.2",
+        version="1.3",
         commands=[Command(command="我的农场")],
         menu_type="群内小游戏",
         configs=[

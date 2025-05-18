@@ -21,8 +21,8 @@ class CShopManager:
             bytes: 返回商店图片bytes
         """
 
-        data_list = []
-        column_name = [
+        dataList = []
+        columnName = [
             "-",
             "种子名称",
             "种子单价",
@@ -48,16 +48,16 @@ class CShopManager:
                 continue
 
             icon = ""
-            icon_path = g_sResourcePath / f"plant/{plant['name']}/icon.png"
-            if icon_path.exists():
-                icon = (icon_path, 33, 33)
+            iconPath = g_sResourcePath / f"plant/{plant['name']}/icon.png"
+            if iconPath.exists():
+                icon = (iconPath, 33, 33)
 
             if plant['again'] == True:
                 sell = "可以"
             else:
                 sell = "不可以"
 
-            data_list.append(
+            dataList.append(
                 [
                     icon,
                     plant['name'],
@@ -79,8 +79,8 @@ class CShopManager:
         result = await ImageTemplate.table_page(
             title,
             "购买示例：@小真寻 购买种子 大白菜 5",
-            column_name,
-            data_list,
+            columnName,
+            dataList,
         )
 
         return result.pic2bytes()

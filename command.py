@@ -6,6 +6,7 @@ from nonebot_plugin_alconna import (Alconna, AlconnaMatch, AlconnaQuery, Args,
 from nonebot_plugin_uninfo import Uninfo
 from nonebot_plugin_waiter import waiter
 
+from zhenxun.configs.config import BotConfig
 from zhenxun.services.log import logger
 from zhenxun.utils.message import MessageUtils
 
@@ -41,7 +42,6 @@ async def handle_register(session: Uninfo):
         return
 
     try:
-        # 获取原始用户名并安全处理
         raw_name = str(session.user.name)
         safe_name = sanitize_username(raw_name)
 
@@ -120,6 +120,7 @@ diuse_farm = on_alconna(
     Alconna(
         "我的农场",
         Option("--all", action=store_true),
+        Subcommand("detail", help_text="农场详述"),
         Subcommand("my-point", help_text="我的农场币"),
         Subcommand("seed-shop", Args["num?", int], help_text="种子商店"),
         Subcommand("buy-seed", Args["name?", str]["num?", int], help_text="购买种子"),
@@ -147,6 +148,27 @@ async def _(session: Uninfo):
 
     image = await g_pFarmManager.drawFarmByUid(uid)
     await MessageUtils.build_message(image).send(reply_to=True)
+
+diuse_farm.shortcut(
+    "农场详述",
+    command="我的农场",
+    arguments=["detail"],
+    prefix=True,
+)
+
+@diuse_farm.assign("detail")
+async def _(session: Uninfo):
+    uid = str(session.user.id)
+
+    if await isRegisteredByUid(uid) == False:
+        return
+
+    info = await g_pFarmManager.drawDetailFarmByUid(uid)
+
+    a = await MessageUtils.alc_forward_msg(info, session.self_id, BotConfig.self_nickname).send(reply_to=True)
+
+    logger.info(f"{a}")
+
 
 diuse_farm.shortcut(
     "我的农场币",

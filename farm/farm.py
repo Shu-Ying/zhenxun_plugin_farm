@@ -171,6 +171,93 @@ class CFarmManager:
         return img.pic2bytes()
 
     @classmethod
+    async def drawDetailFarmByUid(cls, uid: str) -> list:
+        info = []
+
+        farm = await cls.drawFarmByUid(uid)
+
+        info.append(BuildImage.open(farm))
+
+        dataList = []
+        columnName = [
+            "-",
+            "土地ID",
+            "作物名称",
+            "成熟时间",
+            "土地状态",
+            "剩余产出",
+        ]
+
+        icon = ""
+        soilNumber = await g_pDBService.user.getUserSoilByUid(uid)
+
+        for i in range(1, soilNumber + 1):
+            soilInfo = await g_pDBService.userSoil.getUserSoil(uid, i)
+
+            if not soilInfo:
+                continue
+
+            if soilInfo["soilLevel"] == 1:
+                iconPath = g_sResourcePath / f"soil/TODO.png"
+            else:
+                iconPath = g_sResourcePath / f"soil/普通土地.png"
+
+            if iconPath.exists():
+                icon = (iconPath, 33, 33)
+
+            plantName = soilInfo.get("plantName", "-")
+
+            if plantName == "-":
+                matureTime = "-"
+                soilStatus = "-"
+                plantNumber = "-"
+            else:
+                matureTime = datetime.fromtimestamp(int(soilInfo.get("matureTime", 0))).strftime("%Y-%m-%d %H:%M:%S.%f")
+                soilStatus = await g_pDBService.userSoil.getUserSoilStatus(uid, i)
+
+                num = await g_pDBService.userSteal.getTotalStolenCount(uid, i)
+                planInfo = await g_pDBService.plant.getPlantByName(plantName)
+
+                if not planInfo:
+                    plantNumber = f"None / {num}"
+                else:
+                    plantNumber = f"{planInfo['harvest']} / {num}"
+
+            dataList.append(
+            [
+                icon,
+                i,
+                plantName,
+                matureTime,
+                soilStatus,
+                plantNumber,
+            ])
+
+            if len(dataList) >= 15:
+                result = await ImageTemplate.table_page(
+                    "土地详细信息",
+                    "测试N\n测试2",
+                    columnName,
+                    dataList,
+                )
+
+                info.append(result)
+                dataList.clear()
+
+            if i >= 30:
+                result = await ImageTemplate.table_page(
+                    "土地详细信息",
+                    "测试N\n测试2",
+                    columnName,
+                    dataList,
+                )
+
+                info.append(result)
+                dataList.clear()
+
+        return info
+
+    @classmethod
     async def drawSoilPlant(cls, uid: str, soilIndex: int) -> tuple[bool, BuildImage, bool]:
         """绘制植物资源
 
