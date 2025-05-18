@@ -2,6 +2,7 @@ import math
 import os
 import re
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 import aiosqlite
 
@@ -12,10 +13,9 @@ from ..config import g_sDBFilePath, g_sDBPath
 
 class CSqlManager:
     def __init__(self):
-        try:
-            os.mkdir(g_sDBFilePath)
-        except FileExistsError:
-            pass
+            dbPath = Path(g_sDBPath)
+            if dbPath and not dbPath.exists():
+                os.makedirs(dbPath, exist_ok=True)
 
     @classmethod
     async def cleanup(cls):
@@ -25,8 +25,7 @@ class CSqlManager:
     @classmethod
     async def init(cls) -> bool:
         try:
-            _ = os.path.exists(g_sDBFilePath)
-            cls.m_pDB = await aiosqlite.connect(str(g_sDBFilePath))
+            cls.m_pDB = await aiosqlite.connect(g_sDBFilePath)
             cls.m_pDB.row_factory = aiosqlite.Row
             return True
         except Exception as e:
