@@ -9,6 +9,7 @@ class CDBService:
         from .database.userItem import CUserItemDB
         from .database.userPlant import CUserPlantDB
         from .database.userSeed import CUserSeedDB
+        from .database.userSign import CUserSignDB
         from .database.userSoil import CUserSoilDB
         from .database.userSteal import CUserStealDB
 
@@ -32,6 +33,9 @@ class CDBService:
 
         cls.userSteal = CUserStealDB()
         await cls.userSteal.initDB()
+
+        cls.userSign = CUserSignDB()
+        await cls.userSign.initDB()
 
         #迁移旧数据库
         await cls.userSoil.migrateOldFarmData()

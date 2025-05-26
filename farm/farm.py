@@ -2,7 +2,6 @@ import asyncio
 import math
 import random
 from datetime import date, datetime
-from io import StringIO
 from typing import Dict, List, Tuple
 
 from zhenxun.configs.config import Config

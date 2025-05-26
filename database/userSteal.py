@@ -6,17 +6,12 @@ from .database import CSqlManager
 class CUserStealDB(CSqlManager):
     @classmethod
     async def initDB(cls):
-        #uid:           被偷用户Uid
-        #soilIndex:     被偷的地块索引 从1开始
-        #stealerUid:    偷菜用户Uid
-        #stealCount:    被偷数量
-        #stealTime:     被偷时间
         userSteal = {
-            "uid": "TEXT NOT NULL",
-            "soilIndex": "INTEGER NOT NULL",
-            "stealerUid": "TEXT NOT NULL",
-            "stealCount": "INTEGER NOT NULL",
-            "stealTime": "INTEGER NOT NULL",
+            "uid": "TEXT NOT NULL",             #被偷用户Uid
+            "soilIndex": "INTEGER NOT NULL",    #被偷的地块索引 从1开始
+            "stealerUid": "TEXT NOT NULL",      #偷菜用户Uid
+            "stealCount": "INTEGER NOT NULL",   #被偷数量
+            "stealTime": "INTEGER NOT NULL",    #被偷时间
             "PRIMARY KEY": "(uid, soilIndex, stealerUid)"
         }
         await cls.ensureTableSchema("userSteal", userSteal)

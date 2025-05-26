@@ -11,31 +11,19 @@ from .database import CSqlManager
 class CUserSoilDB(CSqlManager):
     @classmethod
     async def initDB(cls):
-        #uid: 用户Uid
-        #soilIndex:         地块索引从1开始
-        #plantName:         作物名称
-        #plantTime:         播种时间
-        #matureTime:        成熟时间
-        #soilLevel:         土地等级 0=普通地，1=红土地，2=黑土地，3=金土地
-        #wiltStatus:        枯萎状态 0=未枯萎，1=枯萎
-        #fertilizerStatus:  施肥状态 0=未施肥，1=施肥 2=增肥
-        #bugStatus:         虫害状态 0=无虫害，1=有虫害
-        #weedStatus:        杂草状态 0=无杂草，1=有杂草
-        #waterStatus:       缺水状态 0=不缺水，1=缺水
-        #harvestCount:      收获次数
         userSoil = {
             "uid": "TEXT NOT NULL",
-            "soilIndex": "INTEGER NOT NULL",
-            "plantName": "TEXT DEFAULT ''",
-            "plantTime": "INTEGER DEFAULT 0",
-            "matureTime": "INTEGER DEFAULT 0",
-            "soilLevel": "INTEGER DEFAULT 0",
-            "wiltStatus": "INTEGER DEFAULT 0",
-            "fertilizerStatus": "INTEGER DEFAULT 0",
-            "bugStatus": "INTEGER DEFAULT 0",
-            "weedStatus": "INTEGER DEFAULT 0",
-            "waterStatus": "INTEGER DEFAULT 0",
-            "harvestCount": "INTEGER DEFAULT 0",
+            "soilIndex": "INTEGER NOT NULL",        #地块索引从1开始
+            "plantName": "TEXT DEFAULT ''",         #作物名称
+            "plantTime": "INTEGER DEFAULT 0",       #播种时间
+            "matureTime": "INTEGER DEFAULT 0",      #成熟时间
+            "soilLevel": "INTEGER DEFAULT 0",       #土地等级 0=普通地，1=红土地，2=黑土地，3=金土地
+            "wiltStatus": "INTEGER DEFAULT 0",      #枯萎状态 0=未枯萎，1=枯萎
+            "fertilizerStatus": "INTEGER DEFAULT 0",#施肥状态 0=未施肥，1=施肥 2=增肥
+            "bugStatus": "INTEGER DEFAULT 0",       #虫害状态 0=无虫害，1=有虫害
+            "weedStatus": "INTEGER DEFAULT 0",      #杂草状态 0=无杂草，1=有杂草
+            "waterStatus": "INTEGER DEFAULT 0",     #缺水状态 0=不缺水，1=缺水
+            "harvestCount": "INTEGER DEFAULT 0",    #收获次数
             "PRIMARY KEY": "(uid, soilIndex)",
         }
 
@@ -93,13 +81,15 @@ class CUserSoilDB(CSqlManager):
                     await cls.m_pDB.execute(
                         """
                         INSERT INTO userSoil
-                        (uid,soilIndex,plantName,plantTime,matureTime,harvestCount,)
+                        (uid,soilIndex,plantName,plantTime,matureTime,harvestCount)
                         VALUES (?,?,?,?,?,?)
                         """,
                         (uid, i, name, pt, mt, 0),
                     )
 
             await cls.m_pDB.execute("DROP TABLE soil")
+
+        logger.info("数据库迁移完毕！")
         return True
 
     @classmethod

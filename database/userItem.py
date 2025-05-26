@@ -8,13 +8,10 @@ from .database import CSqlManager
 class CUserItemDB(CSqlManager):
     @classmethod
     async def initDB(cls):
-        #用户Uid
-        #物品名称
-        #数量
         userItem = {
-            "uid": "INTEGER NOT NULL",
-            "item": "TEXT NOT NULL",
-            "count": "INTEGER NOT NULL DEFAULT 0",
+            "uid": "TEXT NOT NULL",                     #用户Uid
+            "item": "TEXT NOT NULL",                    #物品名称
+            "count": "INTEGER NOT NULL DEFAULT 0",      #数量
             "PRIMARY KEY": "(uid, item)"
         }
 

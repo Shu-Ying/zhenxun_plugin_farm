@@ -1,3 +1,5 @@
+from datetime import date, datetime, timedelta
+
 from nonebot.adapters import Event, MessageTemplate
 from nonebot.rule import to_me
 from nonebot_plugin_alconna import (Alconna, AlconnaMatch, AlconnaQuery, Args,
@@ -133,7 +135,8 @@ diuse_farm = on_alconna(
         Subcommand("stealing", Args["target?", At], help_text="偷菜"),
         Subcommand("buy-point", Args["num?", int], help_text="购买农场币"),
         #Subcommand("sell-point", Args["num?", int], help_text="转换金币")
-        Subcommand("change-name", Args["name?", str], help_text="更改农场名")
+        Subcommand("change-name", Args["name?", str], help_text="更改农场名"),
+        Subcommand("sing-in", help_text="农场签到"),
     ),
     priority=5,
     block=True,
@@ -165,10 +168,7 @@ async def _(session: Uninfo):
 
     info = await g_pFarmManager.drawDetailFarmByUid(uid)
 
-    a = await MessageUtils.alc_forward_msg(info, session.self_id, BotConfig.self_nickname).send(reply_to=True)
-
-    logger.info(f"{a}")
-
+    await MessageUtils.alc_forward_msg([info], session.self_id, BotConfig.self_nickname).send(reply_to=True)
 
 diuse_farm.shortcut(
     "我的农场币",
@@ -445,3 +445,31 @@ async def _(session: Uninfo, name: Match[str]):
         await MessageUtils.build_message("更新用户名成功！").send(reply_to=True)
     else:
         await MessageUtils.build_message("更新用户名失败！").send(reply_to=True)
+
+reclamation = on_alconna(
+    Alconna("农场签到"),
+    priority=5,
+    block=True,
+)
+
+@reclamation.handle()
+async def _(session: Uninfo):
+    uid = str(session.user.id)
+
+    if await isRegisteredByUid(uid) == False:
+        return
+
+    toDay = date.today()
+
+    message = ""
+    status = await g_pDBService.userSign.sign(uid, toDay.strftime("%Y-%m-%d"))
+
+    if status == True:
+        message = "签到成功"
+
+
+    img = await g_pDBService.userSign.drawSignCalendarImage(uid, toDay.year, toDay.month)
+
+    await MessageUtils.build_message(img).send()
+
+    # await MessageUtils.alc_forward_msg([info], session.self_id, BotConfig.self_nickname).send(reply_to=True)

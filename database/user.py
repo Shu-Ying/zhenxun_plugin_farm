@@ -11,21 +11,14 @@ class CUserDB(CSqlManager):
     @classmethod
     async def initDB(cls):
         """初始化用户表结构，确保user表存在且字段完整"""
-        #uid:           用户Uid
-        #name:          农场名称
-        #exp:           经验值
-        #point:         金币
-        #soil:          解锁土地数量
-        #stealTime:     偷菜时间字符串
-        #stealCount:    剩余偷菜次数
         userInfo = {
-            "uid": "INTEGER PRIMARY KEY AUTOINCREMENT",
-            "name": "TEXT NOT NULL",
-            "exp": "INTEGER DEFAULT 0",
-            "point": "INTEGER DEFAULT 0",
-            "soil": "INTEGER DEFAULT 3",
-            "stealTime": "TEXT DEFAULT NULL",
-            "stealCount": "INTEGER DEFAULT 0"
+            "uid": "TEXT PRIMARY KEY",                      #用户Uid
+            "name": "TEXT NOT NULL",                        #农场名称
+            "exp": "INTEGER DEFAULT 0",                     #经验值
+            "point": "INTEGER DEFAULT 0",                   #金币
+            "soil": "INTEGER DEFAULT 3",                    #解锁土地数量
+            "stealTime": "TEXT DEFAULT NULL",               #偷菜时间字符串
+            "stealCount": "INTEGER DEFAULT 0"               #剩余偷菜次数
         }
         await cls.ensureTableSchema("user", userInfo)
 

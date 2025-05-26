@@ -37,7 +37,7 @@ __plugin_meta__ = PluginMetadata(
     """.strip(),
     extra=PluginExtraData(
         author="Art_Sakura",
-        version="1.3",
+        version="1.4",
         commands=[Command(command="我的农场")],
         menu_type="群内小游戏",
         configs=[
@@ -81,6 +81,8 @@ async def start():
     await g_pJsonManager.init()
 
     await g_pDBService.init()
+
+    # await g_pRequestManager.initSignInFile()
 
 # 析构函数
 @driver.on_shutdown
