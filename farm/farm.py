@@ -1,7 +1,6 @@
 import asyncio
 import math
 import random
-from datetime import date, datetime
 from typing import Dict, List, Tuple
 
 from zhenxun.configs.config import Config
@@ -16,6 +15,7 @@ from ..config import g_sResourcePath
 from ..dbService import g_pDBService
 from ..event.event import g_pEventManager
 from ..json import g_pJsonManager
+from ..tool import g_pToolManager
 
 
 class CFarmManager:
@@ -211,7 +211,7 @@ class CFarmManager:
                 soilStatus = "-"
                 plantNumber = "-"
             else:
-                matureTime = datetime.fromtimestamp(int(soilInfo.get("matureTime", 0))).strftime("%Y-%m-%d %H:%M:%S.%f")
+                matureTime = g_pToolManager.dateTime().fromtimestamp(int(soilInfo.get("matureTime", 0))).strftime("%Y-%m-%d %H:%M:%S.%f")
                 soilStatus = await g_pDBService.userSoil.getUserSoilStatus(uid, i)
 
                 num = await g_pDBService.userSteal.getTotalStolenCount(uid, i)
@@ -286,8 +286,8 @@ class CFarmManager:
             logger.error(f"绘制植物资源失败: {soilInfo['plantName']}")
             return False, None, False #type: ignore
 
-        currentTime = datetime.now()
-        matureTime = datetime.fromtimestamp(int(soilInfo['matureTime']))
+        currentTime = g_pToolManager.dateTime().now()
+        matureTime = g_pToolManager.dateTime().fromtimestamp(int(soilInfo['matureTime']))
 
         #如果当前时间大于成熟时间 说明作物成熟
         if currentTime >= matureTime:
@@ -303,7 +303,7 @@ class CFarmManager:
                 return True, plant, False
 
             #如果没有成熟 则根据当前阶段进行绘制
-            plantedTime = datetime.fromtimestamp(int(soilInfo['plantTime']))
+            plantedTime = g_pToolManager.dateTime().fromtimestamp(int(soilInfo['plantTime']))
 
             elapsedTime = currentTime - plantedTime
             elapsedHour = elapsedTime.total_seconds() / 3600
@@ -484,8 +484,8 @@ class CFarmManager:
                 if not plantInfo:
                     continue
 
-                currentTime = datetime.now()
-                matureTime = datetime.fromtimestamp(int(soilInfo['matureTime']))
+                currentTime = g_pToolManager.dateTime().now()
+                matureTime = g_pToolManager.dateTime().fromtimestamp(int(soilInfo['matureTime']))
 
                 if currentTime >= matureTime:
                     number = plantInfo['harvest']
@@ -664,10 +664,10 @@ class CFarmManager:
         stealCount = int(userInfo['stealCount'])
 
         if stealTime == '':
-            stealTime = date.today().strftime('%Y-%m-%d')
+            stealTime = g_pToolManager.dateTime().date().today().strftime('%Y-%m-%d')
             stealCount = 5
-        elif date.fromisoformat(stealTime) != date.today():
-            stealTime = date.today().strftime('%Y-%m-%d')
+        elif g_pToolManager.dateTime().date().fromisoformat(stealTime) != g_pToolManager.dateTime().date().today():
+            stealTime = g_pToolManager.dateTime().date().today().strftime('%Y-%m-%d')
             stealCount = 5
 
         if stealCount <= 0:
@@ -697,8 +697,8 @@ class CFarmManager:
             if not plantInfo:
                 continue
 
-            currentTime = datetime.now()
-            matureTime = datetime.fromtimestamp(int(soilInfo['matureTime']))
+            currentTime = g_pToolManager.dateTime().now()
+            matureTime = g_pToolManager.dateTime().fromtimestamp(int(soilInfo['matureTime']))
 
             if currentTime >= matureTime:
                 #如果偷过，则跳过该土地
@@ -728,10 +728,10 @@ class CFarmManager:
                             await g_pDBService.userSoil.updateUserSoil(uid, i, "lastResetTime", int(currentTime.timestamp()))
                             await g_pDBService.userSoil.updateUserSoil(uid, i, "matureTime", matureTs)
 
-                            await g_pDBService.userSteal.addStealRecord(target, i, uid, randomNumber, int(datetime.now().timestamp()))
+                            await g_pDBService.userSteal.addStealRecord(target, i, uid, randomNumber, int(g_pToolManager.dateTime().now().timestamp()))
 
                     else:
-                        await g_pDBService.userSteal.addStealRecord(target, i, uid, randomNumber, int(datetime.now().timestamp()))
+                        await g_pDBService.userSteal.addStealRecord(target, i, uid, randomNumber, int(g_pToolManager.dateTime().now().timestamp()))
 
         if isStealingPlant <= 0 and isStealingNumber <= 0:
             return "目标没有作物可以被偷"

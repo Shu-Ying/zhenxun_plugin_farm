@@ -1,4 +1,5 @@
 import calendar
+import random
 from datetime import date, datetime, timedelta
 from typing import Optional
 
@@ -8,6 +9,7 @@ from zhenxun.utils._build_image import BuildImage
 from ..dbService import g_pDBService
 from ..json import g_pJsonManager
 from .database import CSqlManager
+from ..tool import g_pToolManager
 
 
 class CUserSignDB(CSqlManager):
@@ -18,8 +20,9 @@ class CUserSignDB(CSqlManager):
             "uid": "TEXT NOT NULL",                                                #用户ID
             "signDate": "DATE NOT NULL",                                           #签到日期
             "isSupplement": "TINYINT NOT NULL DEFAULT 0",                          #是否补签
-            "rewardType": "VARCHAR(20) DEFAULT ''",                                #奖励类型
-            "createdAt": "DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP",            #创建时间
+            "exp": "INT NOT NULL DEFAULT 0",                                       #当天签到经验
+            "point": "INT NOT NULL DEFAULT 0",                                     #当天签到金币
+            "createdAt": "DATETIME NOT NULL DEFAULT (datetime(CURRENT_TIMESTAMP, 'localtime')",#创建时间
             "PRIMARY KEY": "(uid, signDate)"
         }
 
@@ -32,22 +35,52 @@ class CUserSignDB(CSqlManager):
             "lastSignDate": "DATE DEFAULT NULL",                                   #上次签到日期
             "continuousDays": "INT NOT NULL DEFAULT 0",                            #连续签到天数
             "supplementCount": "INT NOT NULL DEFAULT 0",                           #补签次数
-            "updatedAt": "DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP",            #更新时间
+            "updatedAt": "DATETIME NOT NULL DEFAULT (datetime(CURRENT_TIMESTAMP, 'localtime')"#更新时间
         }
 
         await cls.ensureTableSchema("userSignLog", userSignLog)
         await cls.ensureTableSchema("userSignSummary", userSignSummary)
 
     @classmethod
-    async def getUserSignCountByDate(cls, uid: str, monthStr: str) -> int:
+    async def getUserSignRewardByDate(cls, uid: str, date: str) -> tuple[int, int]:
+        """根据指定日期获取用户签到随机奖励
+
+        Args:
+            uid (str): 用户Uid
+            date (str): 用户签到日期 示例：2025-05-27
+
+        Returns:
+            tuple[int, int]: 经验、金币
         """
+        try:
+            async with cls._transaction():
+                async with cls.m_pDB.execute(
+                    "SELECT exp, point FROM userSignLog WHERE uid=? AND signDate=?",
+                    (uid, date)
+                ) as cursor:
+                    row = await cursor.fetchone()
+
+                if row is None:
+                    return 0, 0
+
+                exp = row['exp']
+                point = row['point']
+
+                return exp, point
+        except Exception as e:
+            logger.warning("获取用户签到数据失败", e=e)
+            return 0, 0
+
+    @classmethod
+    async def getUserSignCountByDate(cls, uid: str, monthStr: str) -> int:
+        """根据日期查询用户签到总天数
 
         Args:
             uid (str): 用户Uid
             monthStr (str): 需要查询的日期 示例: 2025-05
 
         Returns:
-            int: _description_
+            int: 查询月总签到天数
         """
         try:
             sql = "SELECT COUNT(*) FROM userSignLog WHERE uid=? AND signDate LIKE ?"
@@ -80,21 +113,43 @@ class CUserSignDB(CSqlManager):
             return False
 
     @classmethod
-    async def sign(cls, uid: str, signDate: str = '') -> bool:
+    async def sign(cls, uid: str, signDate: str = '') -> int:
+        """签到
+
+        Args:
+            uid (int): 用户ID
+            signDate (str): 日期字符串 'YYYY-MM-DD' 不传默认当前系统日期
+
+        Returns:
+            bool: 0: 签到失败 1: 签到成功 2: 重复签到
+        """
         try:
             if not signDate:
-                signDate = date.today().strftime("%Y-%m-%d")
+                signDate = g_pToolManager.dateTime().date().today().strftime("%Y-%m-%d")
 
             if await cls.hasSigned(uid, signDate):
-                return False
+                return 2
 
-            todayStr = date.today().strftime("%Y-%m-%d")
+            todayStr = g_pToolManager.dateTime().date().today().strftime("%Y-%m-%d")
             isSupplement = 0 if signDate == todayStr else 1
+
+            expMax, expMin, pointMax, pointMin = [
+                g_pJsonManager.m_pSign.get(key, default)
+                for key, default in (
+                    ("exp_max", 50),
+                    ("exp_min", 5),
+                    ("point_max", 2000),
+                    ("point_min", 200),
+                )
+            ]
+
+            exp = random.randint(expMin, expMax)
+            point = random.randint(pointMin, pointMax)
 
             async with cls._transaction():
                 await cls.m_pDB.execute(
-                    "INSERT INTO userSignLog (uid, signDate, isSupplement, rewardType) VALUES (?, ?, ?, '')",
-                    (uid, signDate, isSupplement)
+                    "INSERT INTO userSignLog (uid, signDate, isSupplement, exp, point) VALUES (?, ?, ?, ?, ?)",
+                    (uid, signDate, isSupplement, exp, point)
                 )
 
                 cursor = await cls.m_pDB.execute("SELECT * FROM userSignSummary WHERE uid=?", (uid,))
@@ -103,8 +158,9 @@ class CUserSignDB(CSqlManager):
                 currentMonth = signDate[:7]
                 if row:
                     monthSignDays = row['monthSignDays'] + 1 if row['currentMonth'] == currentMonth else 1
+                    totalSignDays = row['totalSignDays']
                     lastDate = row['lastSignDate']
-                    prevDate = (datetime.strptime(signDate, "%Y-%m-%d") - timedelta(days=1)).strftime("%Y-%m-%d")
+                    prevDate = (g_pToolManager.dateTime().strptime(signDate, "%Y-%m-%d") - timedelta(days=1)).strftime("%Y-%m-%d")
                     continuousDays = row['continuousDays'] + 1 if lastDate == prevDate else 1
                     supplementCount = row['supplementCount'] + 1 if isSupplement else row['supplementCount']
                     await cls.m_pDB.execute(
@@ -121,6 +177,7 @@ class CUserSignDB(CSqlManager):
                         (currentMonth, monthSignDays, signDate, continuousDays, supplementCount, uid)
                     )
                 else:
+                    totalSignDays = 1
                     await cls.m_pDB.execute(
                         """
                         INSERT INTO userSignSummary
@@ -129,10 +186,31 @@ class CUserSignDB(CSqlManager):
                         """,
                         (uid, 1, currentMonth, 1, signDate, 1, 1 if isSupplement else 0)
                     )
-            return True
+
+            #计算累签奖励
+            reward = g_pJsonManager.m_pSign['continuou'].get(f"{totalSignDays + 1}", None)
+
+            if reward:
+                point += reward.get('point', 0)
+                exp += reward.get('exp', 0)
+
+                plant = reward.get('plant', {})
+
+                if plant:
+                    for key, value in plant.items():
+                        await g_pDBService.userSeed.addUserSeedByUid(uid, key, value)
+
+            #向数据库更新
+            currentExp = await g_pDBService.user.getUserExpByUid(uid)
+            await g_pDBService.user.updateUserExpByUid(uid, currentExp + exp)
+
+            currentPoint = await g_pDBService.user.getUserPointByUid(uid)
+            await g_pDBService.user.updateUserPointByUid(uid, currentPoint + point)
+
+            return 1
         except Exception as e:
             logger.warning("执行签到失败", e=e)
-            return False
+            return 0
 
     @classmethod
     async def drawSignCalendarImage(cls, uid: str, year: int, month: int):

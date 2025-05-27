@@ -1,6 +1,15 @@
+<div align="center">
+
 # 真寻农场(zhenxun_plugin_farm)
+<p align="center">
+    <a href="./LICENSE">
+        <img src="https://img.shields.io/badge/license-GPL3.0-FE7D37" alt="license">
+    </a>
+</p>
 
 你是说可以种地对吧🤔?
+
+</div>
 
 ---
 

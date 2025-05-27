@@ -1,4 +1,3 @@
-from datetime import date, datetime, timedelta
 from typing import Optional
 
 from zhenxun.services.log import logger
@@ -6,6 +5,7 @@ from zhenxun.services.log import logger
 from ..dbService import g_pDBService
 from ..json import g_pJsonManager
 from .database import CSqlManager
+from ..tool import g_pToolManager
 
 
 class CUserSoilDB(CSqlManager):
@@ -312,7 +312,7 @@ class CUserSoilDB(CSqlManager):
             logger.error(f"未知植物: {plantName}")
             return False
 
-        nowTs = int(datetime.now().timestamp())
+        nowTs = int(g_pToolManager.dateTime().now().timestamp())
         matureTs = nowTs + int(plantCfg.get("time", 0)) * 3600
 
         try:

@@ -1,4 +1,6 @@
 import os
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
 from zhenxun.services.log import logger
 
@@ -28,5 +30,10 @@ class CToolManager:
         except Exception as e:
             logger.warning(f"文件重命名失败: {e}")
             return False
+
+    @classmethod
+    def dateTime(cls) -> datetime:
+        tz = ZoneInfo("Asia/Shanghai")
+        return datetime.now(tz)
 
 g_pToolManager = CToolManager()

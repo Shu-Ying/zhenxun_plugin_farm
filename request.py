@@ -36,7 +36,6 @@ class CRequestManager:
 
         try:
             async with httpx.AsyncClient(timeout=10.0) as client:
-                # 动态组装请求参数
                 requestArgs: dict = {"headers": headers}
                 if params:
                     requestArgs["params"] = params
@@ -60,7 +59,7 @@ class CRequestManager:
             return False
 
     @classmethod
-    async def post(cls, endpoint: str, name: str = "", jsonData: dict = None) -> dict:
+    async def post(cls, endpoint: str, name: str = "", jsonData: dict = {}) -> dict:
         """发送POST请求到指定接口，统一调用，仅支持JSON格式数据
 
         Args:
@@ -74,9 +73,6 @@ class CRequestManager:
         Returns:
             dict: 返回请求结果的JSON数据
         """
-        if jsonData is None:
-            raise ValueError("post请求必须提供jsonData")
-
         baseUrl = Config.get_config("zhenxun_plugin_farm", "服务地址")
         url = f"{baseUrl.rstrip('/')}/{endpoint.lstrip('/')}"
         headers = {"token": cls.m_sTokens}
@@ -129,43 +125,44 @@ class CRequestManager:
             return {}
 
     @classmethod
-    async def initSignInFile(cls):
+    async def initSignInFile(cls) -> bool:
         if os.path.exists(g_sSignInPath):
-
             try:
                 with open(g_sSignInPath, "r", encoding="utf-8") as f:
                     content = f.read()
                     sign = json.loads(content)
 
                 date = sign.get("date", "")
-                yearMonth = datetime.now().strftime("%Y%m")
+                yearMonth = g_pToolManager.dateTime().now().strftime("%Y%m")
 
                 if date == yearMonth:
                     logger.debug("真寻农场签到文件检查完毕")
+                    return True
                 else:
                     logger.warning("真寻农场签到文件检查失败, 即将下载")
-                    await cls.downloadSignInFile()
+                    return await cls.downloadSignInFile()
             except json.JSONDecodeError as e:
                 logger.warning(f"真寻农场签到文件格式错误, 即将下载")
-                await cls.downloadSignInFile()
+                return await cls.downloadSignInFile()
         else:
-            await cls.downloadSignInFile()
+            return await cls.downloadSignInFile()
 
     @classmethod
-    async def downloadSignInFile(cls):
-        baseUrl = Config.get_config("zhenxun_plugin_farm", "服务地址")
+    async def downloadSignInFile(cls) -> bool:
+        try:
+            baseUrl = Config.get_config("zhenxun_plugin_farm", "服务地址")
 
-        url = f"{baseUrl.rstrip('/')}/sign_in"
-        url = f"http://127.0.0.1:8998/sign_in"
+            url = f"{baseUrl.rstrip('/')}:8998/sign_in"
+            path = str(g_sSignInPath.parent.resolve(strict=False))
+            yearMonth = g_pToolManager.dateTime().now().strftime("%Y%m")
 
-        path = str(g_sSignInPath.parent.resolve(strict=False))
-        yearMonth = datetime.now().strftime("%Y%m")
+            await cls.download(url, path, "signTemp.json", jsonData={'date':yearMonth})
+            g_pToolManager.renameFile(f"{path}/signTemp.json", "sign_in.json")
 
-        logger.info(f"{yearMonth}")
-        yearMonth = "202506"
-
-        await cls.download(url, path, "signTemp.json", jsonData={'date':yearMonth})
-        g_pToolManager.renameFile(f"{path}/signTemp.json", "sign_in.json")
+            return True
+        except Exception as e:
+            logger.error("下载签到文件失败", e=e)
+            return False
 
 
 g_pRequestManager = CRequestManager()

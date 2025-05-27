@@ -82,8 +82,6 @@ async def start():
 
     await g_pDBService.init()
 
-    # await g_pRequestManager.initSignInFile()
-
 # 析构函数
 @driver.on_shutdown
 async def shutdown():

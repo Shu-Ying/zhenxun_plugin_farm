@@ -10,3 +10,5 @@ g_sPlantPath = g_sResourcePath / "db/plant.db"
 
 g_sConfigPath = Path(__file__).resolve().parent / "config"
 g_sSignInPath = g_sConfigPath / "sign_in.json"
+
+g_bSignStatus = True

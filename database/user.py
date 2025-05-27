@@ -1,10 +1,10 @@
 import math
-from datetime import date, datetime, timedelta
 from typing import List, Union
 
 from zhenxun.services.log import logger
 
 from .database import CSqlManager
+from ..tool import g_pToolManager
 
 
 class CUserDB(CSqlManager):
@@ -35,7 +35,7 @@ class CUserDB(CSqlManager):
         Returns:
             Union[bool, str]: False 表示失败，字符串表示成功信息
         """
-        nowStr = date.today().strftime('%Y-%m-%d')
+        nowStr = g_pToolManager.dateTime().date().today().strftime('%Y-%m-%d')
         sql = (
             f"INSERT INTO user (uid, name, exp, point, soil, stealTime, stealCount) "
             f"VALUES ({uid}, '{name}', {exp}, {point}, 3, '{nowStr}', 5)"
