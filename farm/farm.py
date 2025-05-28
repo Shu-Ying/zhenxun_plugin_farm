@@ -184,6 +184,7 @@ class CFarmManager:
             "作物名称",
             "成熟时间",
             "土地状态",
+            "被偷数量",
             "剩余产出",
         ]
 
@@ -193,65 +194,65 @@ class CFarmManager:
         for i in range(1, soilNumber + 1):
             soilInfo = await g_pDBService.userSoil.getUserSoil(uid, i)
 
-            if not soilInfo:
-                continue
-
-            if soilInfo["soilLevel"] == 1:
-                iconPath = g_sResourcePath / f"soil/TODO.png"
-            else:
-                iconPath = g_sResourcePath / f"soil/普通土地.png"
-
-            if iconPath.exists():
-                icon = (iconPath, 33, 33)
-
-            plantName = soilInfo.get("plantName", "-")
-
-            if plantName == "-":
-                matureTime = "-"
-                soilStatus = "-"
-                plantNumber = "-"
-            else:
-                matureTime = g_pToolManager.dateTime().fromtimestamp(int(soilInfo.get("matureTime", 0))).strftime("%Y-%m-%d %H:%M:%S.%f")
-                soilStatus = await g_pDBService.userSoil.getUserSoilStatus(uid, i)
-
-                num = await g_pDBService.userSteal.getTotalStolenCount(uid, i)
-                planInfo = await g_pDBService.plant.getPlantByName(plantName)
-
-                if not planInfo:
-                    plantNumber = f"None / {num}"
+            if soilInfo:
+                if soilInfo["soilLevel"] == 1:
+                    iconPath = g_sResourcePath / f"soil/TODO.png"
                 else:
-                    plantNumber = f"{planInfo['harvest']} / {num}"
+                    iconPath = g_sResourcePath / f"soil/普通土地.png"
 
-            dataList.append(
-            [
-                icon,
-                i,
-                plantName,
-                matureTime,
-                soilStatus,
-                plantNumber,
-            ])
+                if iconPath.exists():
+                    icon = (iconPath, 33, 33)
 
-            if len(dataList) >= 15:
+                plantName = soilInfo.get("plantName", "-")
+
+                if plantName == "-":
+                    matureTime = "-"
+                    soilStatus = "-"
+                    totalNumber = "-"
+                    plantNumber = "-"
+                else:
+                    matureTime = g_pToolManager.dateTime().fromtimestamp(int(soilInfo.get("matureTime", 0))).strftime("%Y-%m-%d %H:%M:%S")
+                    soilStatus = await g_pDBService.userSoil.getUserSoilStatus(uid, i)
+
+                    totalNumber = await g_pDBService.userSteal.getTotalStolenCount(uid, i)
+                    planInfo = await g_pDBService.plant.getPlantByName(plantName)
+
+                    if not planInfo:
+                        plantNumber = f"None"
+                    else:
+                        plantNumber = f"{planInfo['harvest']}"
+
+                dataList.append(
+                [
+                    icon,
+                    i,
+                    plantName,
+                    matureTime,
+                    soilStatus,
+                    totalNumber,
+                    plantNumber,
+                ])
+
+                if len(dataList) >= 15:
+                    result = await ImageTemplate.table_page(
+                        "土地详细信息",
+                        "",
+                        columnName,
+                        dataList,
+                    )
+
+                    info.append(result.copy())
+                    dataList.clear()
+
+            if i >= soilNumber:
                 result = await ImageTemplate.table_page(
                     "土地详细信息",
-                    "测试N\n测试2",
+                    "",
                     columnName,
                     dataList,
                 )
 
-                info.append(result)
-                dataList.clear()
-
-            if i >= 30:
-                result = await ImageTemplate.table_page(
-                    "土地详细信息",
-                    "测试N\n测试2",
-                    columnName,
-                    dataList,
-                )
-
-                info.append(result)
+                info.append(result.copy())
                 dataList.clear()
 
         return info
