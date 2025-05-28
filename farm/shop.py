@@ -12,16 +12,28 @@ from ..json import g_pJsonManager
 
 
 class CShopManager:
-
     @classmethod
-    async def getSeedShopImage(cls, num: int = 1) -> bytes:
+    async def getSeedShopImage(cls, filterKey: str|int = 1, num: int = 1) -> bytes:
         """获取商店页面
+
+        Args:
+            filterKey (str|int):
+                - 字符串: 根据关键字筛选种子名称
+                - 整数: 翻至对应页（无筛选）
+            num (int, optional): 当 filterKey 为字符串时，用于指定页码。Defaults to 1.
 
         Returns:
             bytes: 返回商店图片bytes
         """
+        # 解析参数：区分筛选关键字和页码
+        filterStr = None
+        if isinstance(filterKey, int):
+            page = filterKey
+        else:
+            filterStr = filterKey
+            page = num
 
-        dataList = []
+        # 表头定义
         columnName = [
             "-",
             "种子名称",
@@ -32,58 +44,64 @@ class CShopManager:
             "收获数量",
             "成熟时间（小时）",
             "收获次数",
-            "再次成熟时间（小时）",
             "是否可以上架交易行"
         ]
 
-        sell = ""
+        # 查询所有可购买作物，并根据筛选关键字过滤
         plants = await g_pDBService.plant.listPlants()
-        plantSize = await g_pDBService.plant.countPlants(True)
-
-        start = (num - 1) * 15
-        items = islice(plants, start, start + 15)
-
-        for plant in items:
+        filteredPlants = []
+        for plant in plants:
+            # 跳过未解锁购买的种子
             if plant['isBuy'] == 0:
                 continue
+            # 字符串筛选
+            if filterStr and filterStr not in plant['name']:
+                continue
+            filteredPlants.append(plant)
 
+        # 计算分页
+        totalCount = len(filteredPlants)
+        pageCount = math.ceil(totalCount / 15) if totalCount else 1
+        startIndex = (page - 1) * 15
+        pageItems = filteredPlants[startIndex: startIndex + 15]
+
+        # 构建数据行
+        dataList = []
+        for plant in pageItems:
+            # 图标处理
             icon = ""
             iconPath = g_sResourcePath / f"plant/{plant['name']}/icon.png"
             if iconPath.exists():
                 icon = (iconPath, 33, 33)
 
-            if plant['again'] == True:
-                sell = "可以"
-            else:
-                sell = "不可以"
+            # 交易行标记
+            sell = "可以" if plant['sell'] else "不可以"
 
-            dataList.append(
-                [
-                    icon,
-                    plant['name'],
-                    plant['buy'],
-                    plant['level'],
-                    plant['price'],
-                    plant['experience'],
-                    plant['harvest'],
-                    plant['time'],
-                    plant['crop'],
-                    plant['again'],
-                    sell
-                ]
-            )
+            dataList.append([
+                icon,
+                plant['name'],          # 种子名称
+                plant['buy'],           # 种子单价
+                plant['level'],         # 解锁等级
+                plant['price'],         # 果实单价
+                plant['experience'],    # 收获经验
+                plant['harvest'],       # 收获数量
+                plant['time'],          # 成熟时间（小时）
+                plant['crop'],          # 收获次数
+                sell                    # 是否可上架交易行
+            ])
 
-        count = math.ceil(plantSize / 15)
-        title = f"种子商店 页数: {num}/{count}"
+        # 页码标题
+        title = f"种子商店 页数: {page}/{pageCount}"
 
+        # 渲染表格并返回图片bytes
         result = await ImageTemplate.table_page(
             title,
             "购买示例：@小真寻 购买种子 大白菜 5",
             columnName,
             dataList,
         )
-
         return result.pic2bytes()
+
 
     @classmethod
     async def buySeed(cls, uid: str, name: str, num: int = 1) -> str:
@@ -120,7 +138,7 @@ class CShopManager:
         else:
             await g_pDBService.user.updateUserPointByUid(uid, point - total)
 
-            if await g_pDBService.userSeed.addUserSeedByUid(uid, name, num) == False:
+            if not await g_pDBService.userSeed.addUserSeedByUid(uid, name, num):
                 return "购买失败，执行数据库错误！"
 
             return f"成功购买{name}，花费{total}农场币, 剩余{point - total}农场币"

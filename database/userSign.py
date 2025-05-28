@@ -8,8 +8,8 @@ from zhenxun.utils._build_image import BuildImage
 
 from ..dbService import g_pDBService
 from ..json import g_pJsonManager
-from .database import CSqlManager
 from ..tool import g_pToolManager
+from .database import CSqlManager
 
 
 class CUserSignDB(CSqlManager):
@@ -22,7 +22,7 @@ class CUserSignDB(CSqlManager):
             "isSupplement": "TINYINT NOT NULL DEFAULT 0",                          #是否补签
             "exp": "INT NOT NULL DEFAULT 0",                                       #当天签到经验
             "point": "INT NOT NULL DEFAULT 0",                                     #当天签到金币
-            "createdAt": "DATETIME NOT NULL DEFAULT (datetime(CURRENT_TIMESTAMP, 'localtime')",#创建时间
+            "createdAt": "DATETIME NOT NULL DEFAULT (datetime(CURRENT_TIMESTAMP, 'localtime'))",#创建时间
             "PRIMARY KEY": "(uid, signDate)"
         }
 
@@ -35,7 +35,7 @@ class CUserSignDB(CSqlManager):
             "lastSignDate": "DATE DEFAULT NULL",                                   #上次签到日期
             "continuousDays": "INT NOT NULL DEFAULT 0",                            #连续签到天数
             "supplementCount": "INT NOT NULL DEFAULT 0",                           #补签次数
-            "updatedAt": "DATETIME NOT NULL DEFAULT (datetime(CURRENT_TIMESTAMP, 'localtime')"#更新时间
+            "updatedAt": "DATETIME NOT NULL DEFAULT (datetime(CURRENT_TIMESTAMP, 'localtime'))"#更新时间
         }
 
         await cls.ensureTableSchema("userSignLog", userSignLog)
@@ -188,7 +188,7 @@ class CUserSignDB(CSqlManager):
                     )
 
             #计算累签奖励
-            reward = g_pJsonManager.m_pSign['continuou'].get(f"{totalSignDays + 1}", None)
+            reward = g_pJsonManager.m_pSign['continuou'].get(f"{totalSignDays}", None)
 
             if reward:
                 point += reward.get('point', 0)

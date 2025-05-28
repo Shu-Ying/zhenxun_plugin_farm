@@ -22,7 +22,7 @@ __plugin_meta__ = PluginMetadata(
         at 开通农场
         我的农场
         我的农场币
-        种子商店 [页数]
+        种子商店 [筛选关键字] [页数] or [页数]
         购买种子 [作物/种子名称] [数量]
         我的种子
         播种 [作物/种子名称] [数量] (数量不填默认将最大可能播种
@@ -34,6 +34,7 @@ __plugin_meta__ = PluginMetadata(
         开垦
         购买农场币 [数量] 数量为消耗金币的数量
         更改农场名 [新农场名]
+        农场签到
     """.strip(),
     extra=PluginExtraData(
         author="Art_Sakura",

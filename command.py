@@ -1,3 +1,5 @@
+import inspect
+
 from nonebot.adapters import Event, MessageTemplate
 from nonebot.rule import to_me
 from nonebot_plugin_alconna import (Alconna, AlconnaMatch, AlconnaQuery, Args,
@@ -125,7 +127,7 @@ diuse_farm = on_alconna(
         Option("--all", action=store_true),
         Subcommand("detail", help_text="农场详述"),
         Subcommand("my-point", help_text="我的农场币"),
-        Subcommand("seed-shop", Args["num?", int], help_text="种子商店"),
+        Subcommand("seed-shop", Args["res?", MultiVar(str)], help_text="种子商店"),
         Subcommand("buy-seed", Args["name?", str]["num?", int], help_text="购买种子"),
         Subcommand("my-seed", help_text="我的种子"),
         Subcommand("sowing", Args["name?", str]["num?", int], help_text="播种"),
@@ -147,7 +149,7 @@ diuse_farm = on_alconna(
 async def _(session: Uninfo):
     uid = str(session.user.id)
 
-    if await isRegisteredByUid(uid) == False:
+    if not await isRegisteredByUid(uid):
         return
 
     image = await g_pFarmManager.drawFarmByUid(uid)
@@ -164,7 +166,7 @@ diuse_farm.shortcut(
 async def _(session: Uninfo):
     uid = str(session.user.id)
 
-    if await isRegisteredByUid(uid) == False:
+    if not await isRegisteredByUid(uid):
         return
 
     info = await g_pFarmManager.drawDetailFarmByUid(uid)
@@ -197,13 +199,35 @@ diuse_farm.shortcut(
 )
 
 @diuse_farm.assign("seed-shop")
-async def _(session: Uninfo, num: Query[int] = AlconnaQuery("num", 1)):
+async def _(session: Uninfo, res: Match[tuple[str, ...]]):
     uid = str(session.user.id)
 
-    if await isRegisteredByUid(uid) == False:
+    if not await isRegisteredByUid(uid):
         return
 
-    image = await g_pShopManager.getSeedShopImage(num.result)
+    if res.result is inspect._empty:
+        raw = []
+    else:
+        raw = res.result
+
+    filterKey: str | int | None = None
+    page: int = 1
+
+    if len(raw) >= 1 and raw[0] is not None:
+        first = raw[0]
+        if isinstance(first, str) and first.isdigit():
+            page = int(first)
+        else:
+            filterKey = first
+
+    if len(raw) >= 2 and raw[1] is not None and isinstance(raw[1], str) and raw[1].isdigit():
+        page = int(raw[1])
+
+    if filterKey is None:
+        image = await g_pShopManager.getSeedShopImage(page)
+    else:
+        image = await g_pShopManager.getSeedShopImage(filterKey, page)
+
     await MessageUtils.build_message(image).send()
 
 diuse_farm.shortcut(
@@ -214,7 +238,7 @@ diuse_farm.shortcut(
 )
 
 @diuse_farm.assign("buy-seed")
-async def _(session: Uninfo, name: Match[str], num: Query[int] = AlconnaQuery("num", 1),):
+async def _(session: Uninfo, name: Match[str], num: Query[int] = AlconnaQuery("num", 1)):
     if not name.available:
         await MessageUtils.build_message(
             "请在指令后跟需要购买的种子名称"
@@ -222,7 +246,7 @@ async def _(session: Uninfo, name: Match[str], num: Query[int] = AlconnaQuery("n
 
     uid = str(session.user.id)
 
-    if await isRegisteredByUid(uid) == False:
+    if not await isRegisteredByUid(uid):
         return
 
     result = await g_pShopManager.buySeed(uid, name.result, num.result)
@@ -239,7 +263,7 @@ diuse_farm.shortcut(
 async def _(session: Uninfo):
     uid = str(session.user.id)
 
-    if await isRegisteredByUid(uid) == False:
+    if not await isRegisteredByUid(uid):
         return
 
     result = await g_pFarmManager.getUserSeedByUid(uid)
@@ -253,7 +277,7 @@ diuse_farm.shortcut(
 )
 
 @diuse_farm.assign("sowing")
-async def _(session: Uninfo, name: Match[str], num: Query[int] = AlconnaQuery("num", -1),):
+async def _(session: Uninfo, name: Match[str], num: Query[int] = AlconnaQuery("num", -1)):
     if not name.available:
         await MessageUtils.build_message(
             "请在指令后跟需要播种的种子名称"
@@ -261,7 +285,7 @@ async def _(session: Uninfo, name: Match[str], num: Query[int] = AlconnaQuery("n
 
     uid = str(session.user.id)
 
-    if await isRegisteredByUid(uid) == False:
+    if not await isRegisteredByUid(uid):
         return
 
     result = await g_pFarmManager.sowing(uid, name.result, num.result)
@@ -279,7 +303,7 @@ diuse_farm.shortcut(
 async def _(session: Uninfo):
     uid = str(session.user.id)
 
-    if await isRegisteredByUid(uid) == False:
+    if not await isRegisteredByUid(uid):
         return
 
     result = await g_pFarmManager.harvest(uid)
@@ -296,7 +320,7 @@ diuse_farm.shortcut(
 async def _(session: Uninfo):
     uid = str(session.user.id)
 
-    if await isRegisteredByUid(uid) == False:
+    if not await isRegisteredByUid(uid):
         return
 
     result = await g_pFarmManager.eradicate(uid)
@@ -314,7 +338,7 @@ diuse_farm.shortcut(
 async def _(session: Uninfo):
     uid = str(session.user.id)
 
-    if await isRegisteredByUid(uid) == False:
+    if not await isRegisteredByUid(uid):
         return
 
     result = await g_pFarmManager.getUserPlantByUid(uid)
@@ -331,7 +355,7 @@ reclamation = on_alconna(
 async def _(session: Uninfo):
     uid = str(session.user.id)
 
-    if await isRegisteredByUid(uid) == False:
+    if not await isRegisteredByUid(uid):
         return
 
     condition = await g_pFarmManager.reclamationCondition(uid)
@@ -360,10 +384,10 @@ diuse_farm.shortcut(
 )
 
 @diuse_farm.assign("sell-plant")
-async def _(session: Uninfo, name: Match[str], num: Query[int] = AlconnaQuery("num", -1),):
+async def _(session: Uninfo, name: Match[str], num: Query[int] = AlconnaQuery("num", -1)):
     uid = str(session.user.id)
 
-    if await isRegisteredByUid(uid) == False:
+    if not await isRegisteredByUid(uid):
         return
 
     result = await g_pShopManager.sellPlantByUid(uid, name.result, num.result)
@@ -380,7 +404,7 @@ diuse_farm.shortcut(
 async def _(session: Uninfo, target: Match[At]):
     uid = str(session.user.id)
 
-    if await isRegisteredByUid(uid) == False:
+    if not await isRegisteredByUid(uid):
         return
 
     if not target.available:
@@ -412,7 +436,7 @@ async def _(session: Uninfo, num: Query[int] = AlconnaQuery("num", 0)):
 
     uid = str(session.user.id)
 
-    if await isRegisteredByUid(uid) == False:
+    if not await isRegisteredByUid(uid):
         return
 
     result = await g_pFarmManager.buyPointByUid(uid, num.result)
@@ -430,12 +454,12 @@ diuse_farm.shortcut(
 async def _(session: Uninfo, name: Match[str]):
     if not name.available:
         await MessageUtils.build_message(
-            "请在指令后跟需要更改的用户名"
+            "请在指令后跟需要更改的农场名"
         ).finish(reply_to=True)
 
     uid = str(session.user.id)
 
-    if await isRegisteredByUid(uid) == False:
+    if not await isRegisteredByUid(uid):
         return
 
     safeName = sanitize_username(name.result)
@@ -443,9 +467,9 @@ async def _(session: Uninfo, name: Match[str]):
     result = await g_pDBService.user.updateUserNameByUid(uid, safeName)
 
     if result == True:
-        await MessageUtils.build_message("更新用户名成功！").send(reply_to=True)
+        await MessageUtils.build_message("更新农场名成功！").send(reply_to=True)
     else:
-        await MessageUtils.build_message("更新用户名失败！").send(reply_to=True)
+        await MessageUtils.build_message("更新农场名失败！").send(reply_to=True)
 
 diuse_farm.shortcut(
     "农场签到",
@@ -458,11 +482,11 @@ diuse_farm.shortcut(
 async def _(session: Uninfo):
     uid = str(session.user.id)
 
-    if await isRegisteredByUid(uid) == False:
+    if not await isRegisteredByUid(uid):
         return
 
     #判断签到是否正常加载
-    if g_bSignStatus == False:
+    if not g_bSignStatus:
         await MessageUtils.build_message("签到功能异常！").send()
 
         return
@@ -475,7 +499,6 @@ async def _(session: Uninfo):
     if status == 1 or status == 2:
         #获取签到总天数
         signDay = await g_pDBService.userSign.getUserSignCountByDate(uid, toDay.strftime("%Y-%m"))
-
         exp, point = await g_pDBService.userSign.getUserSignRewardByDate(uid, toDay.strftime("%Y-%m-%d"))
 
         message += f"签到成功！累计签到天数：{signDay}\n获得经验{exp}，获得金币{point}"

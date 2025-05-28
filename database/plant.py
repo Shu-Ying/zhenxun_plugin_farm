@@ -1,6 +1,8 @@
+import ast
 import os
 import re
 from contextlib import asynccontextmanager
+from unittest import result
 
 import aiosqlite
 
@@ -86,6 +88,102 @@ class CPlantManager:
         except Exception as e:
             logger.warning(f"查询作物失败: {name}", e=e)
             return None
+
+    @classmethod
+    async def getPlantPhaseByName(cls, name: str) -> list:
+        """根据作物名称获取作物各个阶段
+
+        Args:
+            name (str): 作物名称
+
+        Returns:
+            list: 阶段数组
+        """
+        try:
+            async with cls.m_pDB.execute(
+                "SELECT phase FROM plant WHERE name = ?", (name,)
+            ) as cursor:
+                row = await cursor.fetchone()
+
+                if not row:
+                    return []
+
+                phase = row[0].split(',')
+
+                seen = set()
+                result = []
+                for x in phase:
+                    if x not in seen:
+                        seen.add(x)
+                        result.append(x)
+
+                return result
+        except Exception as e:
+            logger.warning(f"查询作物阶段失败: {name}", e=e)
+            return []
+
+    @classmethod
+    async def getPlantPhaseNumberByName(cls, name: str) -> int:
+        """根据作物名称获取作物总阶段数
+
+        Args:
+            name (str): 作物名称
+
+        Returns:
+            int: 总阶段数
+        """
+        try:
+            async with cls.m_pDB.execute(
+                "SELECT phase FROM plant WHERE name = ?", (name,)
+            ) as cursor:
+                row = await cursor.fetchone()
+
+                if not row:
+                    return -1
+
+                phase = row[0].split(',')
+
+                #去重
+                seen = set()
+                result = []
+                for x in phase:
+                    if x not in seen:
+                        seen.add(x)
+                        result.append(x)
+
+                return len(result)
+        except Exception as e:
+            logger.warning(f"查询作物阶段失败: {name}", e=e)
+            return -1
+
+    @classmethod
+    async def getPlantAgainByName(cls, name: str) -> int:
+        """根据作物名称获取作物再次成熟时间
+
+        Args:
+            name (str): 作物名称
+
+        Returns:
+            int: 再次成熟时间 单位:h
+        """
+
+        try:
+            async with cls.m_pDB.execute(
+                "SELECT phase FROM plant WHERE name = ?", (name,)
+            ) as cursor:
+                row = await cursor.fetchone()
+
+                if not row:
+                    return -1
+
+                phase = row[0].split(',')
+                again = phase[-1] - phase[3] / 60 / 60
+
+                return again
+
+        except Exception as e:
+            logger.warning(f"查询作物阶段失败: {name}", e=e)
+            return -1
 
     @classmethod
     async def existsPlant(cls, name: str) -> bool:

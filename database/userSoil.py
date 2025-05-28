@@ -4,8 +4,8 @@ from zhenxun.services.log import logger
 
 from ..dbService import g_pDBService
 from ..json import g_pJsonManager
-from .database import CSqlManager
 from ..tool import g_pToolManager
+from .database import CSqlManager
 
 
 class CUserSoilDB(CSqlManager):
@@ -240,6 +240,45 @@ class CUserSoilDB(CSqlManager):
             f"UPDATE userSoil SET {field} = ? WHERE uid = ? AND soilIndex = ?",
             (value, uid, soilIndex),
         )
+
+    @classmethod
+    async def updateUserSoilFields(cls, uid: str, soilIndex: int, updates: dict) -> bool:
+        """批量更新指定用户土地的多个字段
+
+        Args:
+            uid (str): 用户ID
+            soilIndex (int): 土地索引
+            updates (dict): 字段-新值的字典
+
+        Returns:
+            bool: 如果无可更新字段则返回 False，否则更新成功返回 True
+        """
+        #允许更新的列白名单
+        allowedFields = {
+            "plantName", "plantTime", "matureTime", "soilLevel",
+            "wiltStatus", "fertilizerStatus", "bugStatus",
+            "weedStatus", "waterStatus", "harvestCount"
+        }
+        setClauses = []
+        values = []
+        for field, value in updates.items():
+            if field not in allowedFields:
+                continue
+            setClauses.append(f'"{field}" = ?')
+            values.append(value)
+        if not setClauses:
+            return False
+
+        values.extend([uid, soilIndex])
+        sql = f'UPDATE userSoil SET {", ".join(setClauses)} WHERE uid = ? AND soilIndex = ?'
+
+        try:
+            async with cls._transaction():
+                await cls.m_pDB.execute(sql, tuple(values))
+            return True
+        except Exception as e:
+            logger.error(f"批量更新土地字段失败: {e}")
+            return False
 
     @classmethod
     async def deleteUserSoil(cls, uid: str, soilIndex: int):
