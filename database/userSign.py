@@ -6,6 +6,7 @@ from typing import Optional
 from zhenxun.services.log import logger
 from zhenxun.utils._build_image import BuildImage
 
+from ..config import g_bIsDebug
 from ..dbService import g_pDBService
 from ..json import g_pJsonManager
 from ..tool import g_pToolManager
@@ -145,6 +146,7 @@ class CUserSignDB(CSqlManager):
 
             exp = random.randint(expMin, expMax)
             point = random.randint(pointMin, pointMax)
+            vipPoint = 0
 
             async with cls._transaction():
                 await cls.m_pDB.execute(
@@ -193,6 +195,7 @@ class CUserSignDB(CSqlManager):
             if reward:
                 point += reward.get('point', 0)
                 exp += reward.get('exp', 0)
+                vipPoint = reward.get('vipPoint', 0)
 
                 plant = reward.get('plant', {})
 
@@ -200,12 +203,19 @@ class CUserSignDB(CSqlManager):
                     for key, value in plant.items():
                         await g_pDBService.userSeed.addUserSeedByUid(uid, key, value)
 
+            if g_bIsDebug:
+                exp += 9999
+
             #向数据库更新
             currentExp = await g_pDBService.user.getUserExpByUid(uid)
             await g_pDBService.user.updateUserExpByUid(uid, currentExp + exp)
 
             currentPoint = await g_pDBService.user.getUserPointByUid(uid)
             await g_pDBService.user.updateUserPointByUid(uid, currentPoint + point)
+
+            if vipPoint > 0:
+                currentVipPoint = await g_pDBService.user.getUserVipPointByUid(uid)
+                await g_pDBService.user.updateUserVipPointByUid(uid, currentVipPoint + vipPoint)
 
             return 1
         except Exception as e:

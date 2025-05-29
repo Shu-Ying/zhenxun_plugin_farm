@@ -140,6 +140,7 @@ diuse_farm = on_alconna(
         #Subcommand("sell-point", Args["num?", int], help_text="转换金币")
         Subcommand("change-name", Args["name?", str], help_text="更改农场名"),
         Subcommand("sign-in", help_text="农场签到"),
+        Subcommand("admin-up", Args["num?", int], help_text="农场下阶段"),
     ),
     priority=5,
     block=True,
@@ -513,6 +514,11 @@ async def _(session: Uninfo):
 
             message += f"\n\n成功领取累计签到奖励：\n额外获得经验{extraExp}，额外获得金币{extraPoint}"
 
+            vipPoint = reward.get('vipPoint', 0)
+
+            if vipPoint > 0:
+                message += f"，额外获得点券{vipPoint}"
+
             if plant:
                 for key, value in plant.items():
                     message += f"\n获得{key}种子 * {value}"
@@ -522,3 +528,19 @@ async def _(session: Uninfo):
     await MessageUtils.build_message(message).send()
 
     # await MessageUtils.alc_forward_msg([info], session.self_id, BotConfig.self_nickname).send(reply_to=True)
+
+diuse_farm.shortcut(
+    "农场下阶段(.*?)",
+    command="我的农场",
+    arguments=["admin-up"],
+    prefix=True,
+)
+
+@diuse_farm.assign("admin-up")
+async def _(session: Uninfo, num: Query[int] = AlconnaQuery("num", 0)):
+    uid = str(session.user.id)
+
+    if not await isRegisteredByUid(uid):
+        return
+
+    await g_pDBService.userSoil.nextPhase(uid, num.result)

@@ -8,7 +8,7 @@ import aiosqlite
 
 from zhenxun.services.log import logger
 
-from ..config import g_sPlantPath
+from ..config import g_bIsDebug, g_sPlantPath
 
 
 class CPlantManager:
@@ -27,7 +27,12 @@ class CPlantManager:
     async def init(cls) -> bool:
         try:
             _ = os.path.exists(g_sPlantPath)
-            cls.m_pDB = await aiosqlite.connect(str(g_sPlantPath))
+
+            if g_bIsDebug:
+                cls.m_pDB = await aiosqlite.connect(str(g_sPlantPath.parent / "plant-test.db"))
+            else:
+                cls.m_pDB = await aiosqlite.connect(str(g_sPlantPath))
+
             cls.m_pDB.row_factory = aiosqlite.Row
             return True
         except Exception as e:

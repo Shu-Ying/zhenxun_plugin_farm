@@ -24,12 +24,7 @@ class CJsonManager:
         if not await self.initSoil():
             return False
 
-        if not await g_pRequestManager.initSignInFile():
-            config.g_bSignStatus = False
-
-            return False
-        else:
-            return await self.initSign()
+        return await self.initSignInFile()
 
     async def initItem(self) -> bool:
         try:
@@ -78,6 +73,14 @@ class CJsonManager:
         except json.JSONDecodeError as e:
             logger.warning(f"soil.json JSON格式错误: {e}")
             return False
+
+    async def initSignInFile(self) -> bool:
+        if not await g_pRequestManager.initSignInFile():
+            config.g_bSignStatus = False
+
+            return False
+        else:
+            return await self.initSign()
 
     async def initSign(self) -> bool:
         try:

@@ -11,7 +11,7 @@ from zhenxun.utils.enum import GoldHandle
 from zhenxun.utils.image_utils import ImageTemplate
 from zhenxun.utils.platform import PlatformUtils
 
-from ..config import g_sResourcePath
+from ..config import g_bIsDebug, g_sResourcePath
 from ..dbService import g_pDBService
 from ..event.event import g_pEventManager
 from ..json import g_pJsonManager
@@ -88,11 +88,11 @@ class CFarmManager:
             if index < soilUnlock:
                 await img.paste(soil, (x, y))
 
-                isPlant, plant, isRipe= await cls.drawSoilPlant(uid, index + 1)
+                isPlant, plant, isRipe, offsetX, offsetY = await cls.drawSoilPlant(uid, index + 1)
 
                 if isPlant:
-                    await img.paste(plant, (x + soilSize[0] // 2 - plant.width // 2,
-                                            y + soilSize[1] // 2 - plant.height // 2))
+                    await img.paste(plant, (x + soilSize[0] // 2 - plant.width // 2 + offsetX,
+                                            y + soilSize[1] // 2 - plant.height // 2 + offsetY))
 
                 #1700 275
                 #首次添加可收获图片
@@ -258,7 +258,7 @@ class CFarmManager:
         return info
 
     @classmethod
-    async def drawSoilPlant(cls, uid: str, soilIndex: int) -> tuple[bool, BuildImage, bool]:
+    async def drawSoilPlant(cls, uid: str, soilIndex: int) -> tuple[bool, BuildImage, bool, int, int]:
         """绘制植物资源
 
         Args:
@@ -279,13 +279,18 @@ class CFarmManager:
         if int(soilInfo.get("wiltStatus", 0)) == 1:
             plant = BuildImage(background = g_sResourcePath / f"plant/basic/9.png")
             await plant.resize(0, 150, 212)
-            return True, plant, False
+            return True, plant, False, 0, 0
 
         #获取作物详细信息
         plantInfo = await g_pDBService.plant.getPlantByName(soilInfo['plantName'])
         if not plantInfo:
             logger.error(f"绘制植物资源失败: {soilInfo['plantName']}")
-            return False, None, False #type: ignore
+            return False, None, False, 0, 0 #type: ignore
+
+        offsetX = plantInfo.get('officX', 0)
+        offsetY = plantInfo.get('officY', 0)
+        offsetW = plantInfo.get('officW', 0)
+        offsetH = plantInfo.get('officH', 0)
 
         currentTime = g_pToolManager.dateTime().now()
         matureTime = g_pToolManager.dateTime().fromtimestamp(int(soilInfo['matureTime']))
@@ -296,13 +301,13 @@ class CFarmManager:
         if currentTime >= matureTime:
             plant = BuildImage(background = g_sResourcePath / f"plant/{soilInfo['plantName']}/{phase}.png")
 
-            return True, plant, True
+            return True, plant, True, offsetX, offsetY
         else:
             #如果是多阶段作物 且没有成熟 #早期思路 多阶段作物 直接是倒数第二阶段图片
             # if soilInfo['harvestCount'] >= 1:
             #     plant = BuildImage(background = g_sResourcePath / f"plant/{soilInfo['plantName']}/{plantInfo['phase'] - 1s}.png")
 
-            #     return True, plant, False
+            #     return True, plant, False, offsetX, offsetY
 
             #如果没有成熟 则根据当前阶段进行绘制
             plantedTime = g_pToolManager.dateTime().fromtimestamp(int(soilInfo['plantTime']))
@@ -318,11 +323,11 @@ class CFarmManager:
                 else:
                     plant = BuildImage(background = g_sResourcePath / f"plant/basic/0.png")
 
-                await plant.resize(0, 35, 58)
+                await plant.resize(0, 35 + offsetW, 58 + offsetH)
             else:
                 plant = BuildImage(background = g_sResourcePath / f"plant/{soilInfo['plantName']}/{currentStage}.png")
 
-        return True, plant, False
+        return True, plant, False, offsetX, offsetY
 
     @classmethod
     async def getUserSeedByUid(cls, uid: str) -> bytes:
@@ -568,6 +573,9 @@ class CFarmManager:
 
                 experience += 3
 
+                if g_bIsDebug:
+                    experience += 999
+
                 #批量更新数据库操作
                 await g_pDBService.userSoil.deleteUserSoil(uid, i)
 
@@ -775,13 +783,13 @@ class CFarmManager:
 
             str = ""
             if len(item) == 0:
-                str = f"下次升级所需条件：等级：{level}，农场币：{point}"
+                str = f"下次开垦所需条件：等级：{level}，农场币：{point}"
             else:
-                str = f"下次升级所需条件：等级：{level}，农场币：{point}，物品：{item}"
+                str = f"下次开垦所需条件：等级：{level}，农场币：{point}，物品：{item}"
 
             return str
         except Exception as e:
-            return "获取升级土地条件失败！"
+            return "获取开垦土地条件失败！"
 
     @classmethod
     async def reclamation(cls, uid: str) -> str:

@@ -3,8 +3,8 @@ from typing import List, Union
 
 from zhenxun.services.log import logger
 
-from .database import CSqlManager
 from ..tool import g_pToolManager
+from .database import CSqlManager
 
 
 class CUserDB(CSqlManager):
@@ -16,6 +16,7 @@ class CUserDB(CSqlManager):
             "name": "TEXT NOT NULL",                        #农场名称
             "exp": "INTEGER DEFAULT 0",                     #经验值
             "point": "INTEGER DEFAULT 0",                   #金币
+            "vipPoint": "INTEGER DEFAULT 0",                #点券
             "soil": "INTEGER DEFAULT 3",                    #解锁土地数量
             "stealTime": "TEXT DEFAULT NULL",               #偷菜时间字符串
             "stealCount": "INTEGER DEFAULT 0"               #剩余偷菜次数
@@ -201,6 +202,52 @@ class CUserDB(CSqlManager):
             return True
         except Exception as e:
             logger.error("updateUserPointByUid 事务执行失败！", e=e)
+            return False
+
+    @classmethod
+    async def getUserVipPointByUid(cls, uid: str) -> int:
+        """获取指定用户点券
+
+        Args:
+            uid (str): 用户Uid
+
+        Returns:
+            int: 点券数量，失败返回 -1
+        """
+        if not uid:
+            return -1
+        try:
+            async with cls.m_pDB.execute(
+                "SELECT vipPoint FROM user WHERE uid = ?", (uid,)
+            ) as cursor:
+                row = await cursor.fetchone()
+                return int(row[0]) if row and row[0] is not None else -1
+        except Exception as e:
+            logger.warning("getUservipPointByUid 查询失败！", e=e)
+            return -1
+
+    @classmethod
+    async def updateUserVipPointByUid(cls, uid: str, vipPoint: int) -> bool:
+        """根据用户Uid更新农场币数量
+
+        Args:
+            uid (str): 用户Uid
+            vipPoint (int): 新农场币数量
+
+        Returns:
+            bool: 是否更新成功
+        """
+        if not uid or vipPoint < 0:
+            logger.warning("updateUservipPointByUid 参数校验失败！")
+            return False
+        try:
+            async with cls._transaction():
+                await cls.m_pDB.execute(
+                    "UPDATE user SET vipPoint = ? WHERE uid = ?", (vipPoint, uid)
+                )
+            return True
+        except Exception as e:
+            logger.error("updateUservipPointByUid 事务执行失败！", e=e)
             return False
 
     @classmethod

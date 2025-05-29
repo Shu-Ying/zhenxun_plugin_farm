@@ -1,5 +1,6 @@
 from nonebot import get_driver
 from nonebot.plugin import PluginMetadata
+from nonebot_plugin_apscheduler import scheduler
 
 from zhenxun.configs.utils import Command, PluginExtraData, RegisterConfig
 from zhenxun.services.log import logger
@@ -89,3 +90,12 @@ async def shutdown():
     await g_pSqlManager.cleanup()
 
     await g_pDBService.cleanup()
+
+
+@scheduler.add_job(
+    trigger="cron",
+    hour=0,
+    minute=30,
+)
+async def _():
+    await g_pJsonManager.initSignInFile()

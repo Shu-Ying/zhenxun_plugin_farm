@@ -2,6 +2,7 @@ from typing import Optional
 
 from zhenxun.services.log import logger
 
+from ..config import g_bIsDebug
 from ..dbService import g_pDBService
 from ..json import g_pJsonManager
 from ..tool import g_pToolManager
@@ -28,6 +29,46 @@ class CUserSoilDB(CSqlManager):
         }
 
         await cls.ensureTableSchema("userSoil", userSoil)
+
+    @classmethod
+    async def nextPhase(cls, uid: str, soilIndex: int):
+        """将指定地块的作物进入下个阶段
+
+        Args:
+            soilIndex (int): 地块索引 从1开始
+        """
+        if not g_bIsDebug:
+            return
+
+        soilInfo = await cls.getUserSoil(uid, soilIndex)
+
+        if not soilInfo:
+            return
+
+        plantInfo = await g_pDBService.plant.getPlantByName(soilInfo['plantName'])
+
+        if not plantInfo:
+            return
+
+        currentTime = g_pToolManager.dateTime().now()
+        matureTime = g_pToolManager.dateTime().fromtimestamp(int(soilInfo['matureTime']))
+
+        phase = await g_pDBService.plant.getPlantPhaseNumberByName(soilInfo['plantName'])
+        phaseList = await g_pDBService.plant.getPlantPhaseByName(soilInfo['plantName'])
+
+        if currentTime >= matureTime:
+            return
+
+        plantedTime = g_pToolManager.dateTime().fromtimestamp(int(soilInfo['plantTime']))
+
+        elapsedTime = currentTime - plantedTime
+        elapsedHour = elapsedTime.total_seconds() / 3600
+
+        currentStage = int(elapsedHour / (plantInfo['time'] / phase))
+
+        t = int(soilInfo['plantTime']) - phaseList[currentStage]
+
+        await cls.updateUserSoil(uid, soilIndex, "plantTime", t)
 
     @classmethod
     async def getUserFarmByUid(cls, uid: str) -> dict:
