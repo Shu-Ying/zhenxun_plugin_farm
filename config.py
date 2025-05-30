@@ -2,7 +2,7 @@ from pathlib import Path
 
 from zhenxun.configs.path_config import DATA_PATH
 
-g_bIsDebug = True
+g_bIsDebug = False
 
 g_sDBPath = DATA_PATH / "farm_db"
 g_sDBFilePath = DATA_PATH / "farm_db/farm.db"
