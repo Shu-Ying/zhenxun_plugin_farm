@@ -92,10 +92,14 @@ async def shutdown():
     await g_pDBService.cleanup()
 
 
-@scheduler.add_job(
+@scheduler.scheduled_job(
     trigger="cron",
     hour=0,
     minute=30,
+    id="signInFile"
 )
-async def _():
-    await g_pJsonManager.initSignInFile()
+async def signInFile():
+    try:
+        await g_pJsonManager.initSignInFile()
+    except:
+        logger.info("农场签到文件下载失败！")

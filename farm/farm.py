@@ -220,7 +220,7 @@ class CFarmManager:
                     if not planInfo:
                         plantNumber = f"None"
                     else:
-                        plantNumber = f"{planInfo['harvest']}"
+                        plantNumber = f"{planInfo['harvest'] - totalNumber}"
 
                 dataList.append(
                 [
@@ -272,8 +272,8 @@ class CFarmManager:
         plant = None
         soilInfo = await g_pDBService.userSoil.getUserSoil(uid, soilIndex)
 
-        if not soilInfo or not soilInfo.get("plantName"):
-            return False, None, False #type: ignore
+        if not soilInfo:
+            return False, None, False, 0, 0 #type: ignore
 
         #是否枯萎
         if int(soilInfo.get("wiltStatus", 0)) == 1:
@@ -292,14 +292,12 @@ class CFarmManager:
         offsetW = plantInfo.get('officW', 0)
         offsetH = plantInfo.get('officH', 0)
 
-        currentTime = g_pToolManager.dateTime().now()
-        matureTime = g_pToolManager.dateTime().fromtimestamp(int(soilInfo['matureTime']))
-
-        phase = await g_pDBService.plant.getPlantPhaseNumberByName(soilInfo['plantName'])
+        currentTime = g_pToolManager.dateTime().now().timestamp()
+        phaseList = await g_pDBService.plant.getPlantPhaseByName(soilInfo['plantName'])
 
         #如果当前时间大于成熟时间 说明作物成熟
-        if currentTime >= matureTime:
-            plant = BuildImage(background = g_sResourcePath / f"plant/{soilInfo['plantName']}/{phase}.png")
+        if currentTime >= soilInfo['matureTime']:
+            plant = BuildImage(background = g_sResourcePath / f"plant/{soilInfo['plantName']}/{len(phaseList)}.png")
 
             return True, plant, True, offsetX, offsetY
         else:
@@ -310,12 +308,13 @@ class CFarmManager:
             #     return True, plant, False, offsetX, offsetY
 
             #如果没有成熟 则根据当前阶段进行绘制
-            plantedTime = g_pToolManager.dateTime().fromtimestamp(int(soilInfo['plantTime']))
+            currentStage = 0
+            elapsedTime = currentTime - soilInfo['plantTime']
 
-            elapsedTime = currentTime - plantedTime
-            elapsedHour = elapsedTime.total_seconds() / 3600
-
-            currentStage = int(elapsedHour / (plantInfo['time'] / phase))
+            for idx, thr in enumerate(phaseList, start=1):
+                if elapsedTime < thr:
+                    currentStage = idx
+                    break
 
             if currentStage <= 0:
                 if plantInfo['general'] == False:
@@ -675,10 +674,10 @@ class CFarmManager:
         #用户信息
         userInfo = await g_pDBService.user.getUserInfoByUid(uid)
 
-        stealTime = userInfo['stealTime']
+        stealTime = userInfo.get('stealTime', "")
         stealCount = int(userInfo['stealCount'])
 
-        if stealTime == '':
+        if stealTime == "" or not stealTime:
             stealTime = g_pToolManager.dateTime().date().today().strftime('%Y-%m-%d')
             stealCount = 5
         elif g_pToolManager.dateTime().date().fromisoformat(stealTime) != g_pToolManager.dateTime().date().today():
@@ -689,17 +688,17 @@ class CFarmManager:
             return "你今天可偷次数到达上限啦，手下留情吧"
 
         #获取用户解锁地块数量
-        soilNumber = await g_pDBService.user.getUserSoilByUid(uid)
+        soilNumber = await g_pDBService.user.getUserSoilByUid(target)
         harvestRecords: List[str] = []
         isStealingNumber = 0
         isStealingPlant = 0
 
         for i in range(1, soilNumber + 1):
             #如果没有种植
-            if not await g_pDBService.userSoil.isSoilPlanted(uid, i):
+            if not await g_pDBService.userSoil.isSoilPlanted(target, i):
                 continue
 
-            soilInfo = await g_pDBService.userSoil.getUserSoil(uid, i)
+            soilInfo = await g_pDBService.userSoil.getUserSoil(target, i)
             if not soilInfo:
                 continue
 

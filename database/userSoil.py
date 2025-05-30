@@ -50,25 +50,30 @@ class CUserSoilDB(CSqlManager):
         if not plantInfo:
             return
 
-        currentTime = g_pToolManager.dateTime().now()
-        matureTime = g_pToolManager.dateTime().fromtimestamp(int(soilInfo['matureTime']))
-
-        phase = await g_pDBService.plant.getPlantPhaseNumberByName(soilInfo['plantName'])
+        currentTime = g_pToolManager.dateTime().now().timestamp()
         phaseList = await g_pDBService.plant.getPlantPhaseByName(soilInfo['plantName'])
 
-        if currentTime >= matureTime:
+        if currentTime >= soilInfo['matureTime']:
             return
 
-        plantedTime = g_pToolManager.dateTime().fromtimestamp(int(soilInfo['plantTime']))
+        currentStage = 0
+        elapsedTime = currentTime - soilInfo['plantTime']
 
-        elapsedTime = currentTime - plantedTime
-        elapsedHour = elapsedTime.total_seconds() / 3600
-
-        currentStage = int(elapsedHour / (plantInfo['time'] / phase))
+        for idx, thr in enumerate(phaseList, start=1):
+            if elapsedTime < thr:
+                currentStage = idx
+                break
 
         t = int(soilInfo['plantTime']) - phaseList[currentStage]
+        s = int(soilInfo['matureTime']) - phaseList[currentStage]
 
-        await cls.updateUserSoil(uid, soilIndex, "plantTime", t)
+        await cls.updateUserSoilFields(uid, soilIndex,
+                                       {
+                                           "plantTime": t,
+                                           "matureTime": s
+                                       })
+
+        logger.debug(f"当前阶段{currentStage}, 阶段时间{phaseList[currentStage]}, 播种时间{t}, 收获时间{s}")
 
     @classmethod
     async def getUserFarmByUid(cls, uid: str) -> dict:

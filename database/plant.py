@@ -95,7 +95,7 @@ class CPlantManager:
             return None
 
     @classmethod
-    async def getPlantPhaseByName(cls, name: str) -> list:
+    async def getPlantPhaseByName(cls, name: str) -> list[int]:
         """根据作物名称获取作物各个阶段
 
         Args:
@@ -119,8 +119,8 @@ class CPlantManager:
                 result = []
                 for x in phase:
                     if x not in seen:
-                        seen.add(x)
-                        result.append(x)
+                        seen.add(int(x))
+                        result.append(int(x))
 
                 return result
         except Exception as e:

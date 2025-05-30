@@ -1,5 +1,6 @@
 import math
 from typing import List, Union
+from unittest import result
 
 from zhenxun.services.log import logger
 
@@ -18,7 +19,7 @@ class CUserDB(CSqlManager):
             "point": "INTEGER DEFAULT 0",                   #金币
             "vipPoint": "INTEGER DEFAULT 0",                #点券
             "soil": "INTEGER DEFAULT 3",                    #解锁土地数量
-            "stealTime": "TEXT DEFAULT NULL",               #偷菜时间字符串
+            "stealTime": "TEXT DEFAULT ''",                 #偷菜时间字符串
             "stealCount": "INTEGER DEFAULT 0"               #剩余偷菜次数
         }
         await cls.ensureTableSchema("user", userInfo)
@@ -98,17 +99,13 @@ class CUserDB(CSqlManager):
             async with cls.m_pDB.execute(
                 "SELECT * FROM user WHERE uid = ?", (uid,)
             ) as cursor:
-                async for row in cursor:
-                    return {
-                        "uid": row[0],
-                        "name": row[1],
-                        "exp": row[2],
-                        "point": row[3],
-                        "soil": row[4],
-                        "stealTime": row[5] or "",
-                        "stealCount": int(row[6])
-                    }
-            return {}
+                row = await cursor.fetchone()
+                if not row:
+                    return {}
+
+                result = dict(row)
+
+            return result
         except Exception as e:
             logger.warning("getUserInfoByUid 查询失败！", e=e)
             return {}

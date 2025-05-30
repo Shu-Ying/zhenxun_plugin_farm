@@ -465,6 +465,10 @@ async def _(session: Uninfo, name: Match[str]):
 
     safeName = sanitize_username(name.result)
 
+    if safeName == "神秘农夫":
+        await MessageUtils.build_message("农场名不支持特殊符号！").send(reply_to=True)
+        return
+
     result = await g_pDBService.user.updateUserNameByUid(uid, safeName)
 
     if result == True:
