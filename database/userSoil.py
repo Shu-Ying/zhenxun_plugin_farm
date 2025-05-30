@@ -56,13 +56,8 @@ class CUserSoilDB(CSqlManager):
         if currentTime >= soilInfo['matureTime']:
             return
 
-        currentStage = 0
         elapsedTime = currentTime - soilInfo['plantTime']
-
-        for idx, thr in enumerate(phaseList, start=1):
-            if elapsedTime < thr:
-                currentStage = idx
-                break
+        currentStage = currentStage = sum(1 for thr in phaseList if elapsedTime >= thr)
 
         t = int(soilInfo['plantTime']) - phaseList[currentStage]
         s = int(soilInfo['matureTime']) - phaseList[currentStage]

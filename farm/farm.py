@@ -308,13 +308,9 @@ class CFarmManager:
             #     return True, plant, False, offsetX, offsetY
 
             #如果没有成熟 则根据当前阶段进行绘制
-            currentStage = 0
-            elapsedTime = currentTime - soilInfo['plantTime']
 
-            for idx, thr in enumerate(phaseList, start=1):
-                if elapsedTime < thr:
-                    currentStage = idx
-                    break
+            elapsedTime = currentTime - soilInfo['plantTime']
+            currentStage = sum(1 for thr in phaseList if elapsedTime >= thr)
 
             if currentStage <= 0:
                 if plantInfo['general'] == False:
