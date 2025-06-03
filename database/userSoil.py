@@ -117,9 +117,14 @@ class CUserSoilDB(CSqlManager):
                     data = farmInfo.get(key)
                     if not data:
                         continue
+
+                    if data == ",,,4,":
+                        continue
+
                     parts = data.split(",")
                     if len(parts) < 3:
                         continue
+
                     name = parts[0]
                     pt = int(parts[1])
                     mt = int(parts[2])
