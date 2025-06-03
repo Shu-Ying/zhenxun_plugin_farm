@@ -117,10 +117,13 @@ class CPlantManager:
 
                 seen = set()
                 result = []
+
                 for x in phase:
-                    if x not in seen:
-                        seen.add(int(x))
-                        result.append(int(x))
+                    num = int(x)
+
+                    if num not in seen:
+                        seen.add(num)
+                        result.append(num)
 
                 return result
         except Exception as e:
