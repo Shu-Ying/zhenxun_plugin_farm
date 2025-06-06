@@ -1,6 +1,4 @@
-__pycache__/
-
-./config/sign_in.json
+/config/sign_in.json
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
