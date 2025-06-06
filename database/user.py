@@ -1,6 +1,4 @@
 import math
-from typing import List, Union
-from unittest import result
 
 from zhenxun.services.log import logger
 
@@ -13,19 +11,21 @@ class CUserDB(CSqlManager):
     async def initDB(cls):
         """初始化用户表结构，确保user表存在且字段完整"""
         userInfo = {
-            "uid": "TEXT PRIMARY KEY",                      #用户Uid
-            "name": "TEXT NOT NULL",                        #农场名称
-            "exp": "INTEGER DEFAULT 0",                     #经验值
-            "point": "INTEGER DEFAULT 0",                   #金币
-            "vipPoint": "INTEGER DEFAULT 0",                #点券
-            "soil": "INTEGER DEFAULT 3",                    #解锁土地数量
-            "stealTime": "TEXT DEFAULT ''",                 #偷菜时间字符串
-            "stealCount": "INTEGER DEFAULT 0"               #剩余偷菜次数
+            "uid": "TEXT PRIMARY KEY",  # 用户Uid
+            "name": "TEXT NOT NULL",  # 农场名称
+            "exp": "INTEGER DEFAULT 0",  # 经验值
+            "point": "INTEGER DEFAULT 0",  # 金币
+            "vipPoint": "INTEGER DEFAULT 0",  # 点券
+            "soil": "INTEGER DEFAULT 3",  # 解锁土地数量
+            "stealTime": "TEXT DEFAULT ''",  # 偷菜时间字符串
+            "stealCount": "INTEGER DEFAULT 0",  # 剩余偷菜次数
         }
         await cls.ensureTableSchema("user", userInfo)
 
     @classmethod
-    async def initUserInfoByUid(cls, uid: str, name: str = "", exp: int = 0, point: int = 500) -> Union[bool, str]:
+    async def initUserInfoByUid(
+        cls, uid: str, name: str = "", exp: int = 0, point: int = 500
+    ) -> bool | str:
         """初始化用户信息，包含初始偷菜时间字符串与次数
 
         Args:
@@ -37,7 +37,7 @@ class CUserDB(CSqlManager):
         Returns:
             Union[bool, str]: False 表示失败，字符串表示成功信息
         """
-        nowStr = g_pToolManager.dateTime().date().today().strftime('%Y-%m-%d')
+        nowStr = g_pToolManager.dateTime().date().today().strftime("%Y-%m-%d")
         sql = (
             f"INSERT INTO user (uid, name, exp, point, soil, stealTime, stealCount) "
             f"VALUES ({uid}, '{name}', {exp}, {point}, 3, '{nowStr}', 5)"
@@ -51,7 +51,7 @@ class CUserDB(CSqlManager):
             return False
 
     @classmethod
-    async def getAllUsers(cls) -> List[str]:
+    async def getAllUsers(cls) -> list[str]:
         """获取所有用户UID列表
 
         Returns:
@@ -395,8 +395,7 @@ class CUserDB(CSqlManager):
             return ""
         try:
             async with cls.m_pDB.execute(
-                "SELECT stealTime FROM user WHERE uid = ?", (uid,
-                )
+                "SELECT stealTime FROM user WHERE uid = ?", (uid,)
             ) as cursor:
                 row = await cursor.fetchone()
                 return row[0] if row and row[0] else ""
@@ -451,11 +450,14 @@ class CUserDB(CSqlManager):
             return -1
 
     @classmethod
-    async def updateStealCountByUid(cls, uid: str, stealCount: int) -> bool:
+    async def updateStealCountByUid(
+        cls, uid: str, stealTime: str, stealCount: int
+    ) -> bool:
         """根据用户Uid更新剩余偷菜次数
 
         Args:
             uid (str): 用户Uid
+            stealTime (str): 偷菜日期
             stealCount (int): 新剩余偷菜次数
 
         Returns:
@@ -467,7 +469,8 @@ class CUserDB(CSqlManager):
         try:
             async with cls._transaction():
                 await cls.m_pDB.execute(
-                    "UPDATE user SET stealCount = ? WHERE uid = ?", (stealCount, uid)
+                    "UPDATE user SET stealTime = ?, stealCount = ? WHERE uid = ?",
+                    (stealTime, stealCount, uid),
                 )
             return True
         except Exception as e:

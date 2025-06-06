@@ -1,5 +1,3 @@
-from typing import Optional
-
 from zhenxun.services.log import logger
 
 from .database import CSqlManager
@@ -9,16 +7,16 @@ class CUserItemDB(CSqlManager):
     @classmethod
     async def initDB(cls):
         userItem = {
-            "uid": "TEXT NOT NULL",                     #用户Uid
-            "item": "TEXT NOT NULL",                    #物品名称
-            "count": "INTEGER NOT NULL DEFAULT 0",      #数量
-            "PRIMARY KEY": "(uid, item)"
+            "uid": "TEXT NOT NULL",  # 用户Uid
+            "item": "TEXT NOT NULL",  # 物品名称
+            "count": "INTEGER NOT NULL DEFAULT 0",  # 数量
+            "PRIMARY KEY": "(uid, item)",
         }
 
         await cls.ensureTableSchema("userItem", userItem)
 
     @classmethod
-    async def getUserItemByName(cls, uid: str, item: str) -> Optional[int]:
+    async def getUserItemByName(cls, uid: str, item: str) -> int | None:
         """根据道具名称查询某一项数量
 
         Args:
@@ -32,13 +30,12 @@ class CUserItemDB(CSqlManager):
             return None
         try:
             async with cls.m_pDB.execute(
-                "SELECT count FROM userItem WHERE uid = ? AND item = ?",
-                (uid, item)
+                "SELECT count FROM userItem WHERE uid = ? AND item = ?", (uid, item)
             ) as cursor:
                 row = await cursor.fetchone()
                 return row[0] if row else None
         except Exception as e:
-            logger.warning(f"getUserItemByName查询失败！", e=e)
+            logger.warning("getUserItemByName查询失败！", e=e)
             return None
 
     @classmethod
@@ -55,13 +52,12 @@ class CUserItemDB(CSqlManager):
             return {}
         try:
             cursor = await cls.m_pDB.execute(
-                "SELECT item, count FROM userItem WHERE uid = ?",
-                (uid,)
+                "SELECT item, count FROM userItem WHERE uid = ?", (uid,)
             )
             rows = await cursor.fetchall()
             return {row["item"]: row["count"] for row in rows}
         except Exception as e:
-            logger.warning(f"getUserItemByUid查询失败！", e=e)
+            logger.warning("getUserItemByUid查询失败！", e=e)
             return {}
 
     @classmethod
@@ -80,12 +76,11 @@ class CUserItemDB(CSqlManager):
         try:
             async with cls._transaction():
                 await cls.m_pDB.execute(
-                    "DELETE FROM userItem WHERE uid = ? AND item = ?",
-                    (uid, item)
+                    "DELETE FROM userItem WHERE uid = ? AND item = ?", (uid, item)
                 )
             return True
         except Exception as e:
-            logger.warning(f"deleteUserItemByName失败！", e=e)
+            logger.warning("deleteUserItemByName失败！", e=e)
             return False
 
     @classmethod
@@ -106,17 +101,16 @@ class CUserItemDB(CSqlManager):
             async with cls._transaction():
                 if count <= 0:
                     await cls.m_pDB.execute(
-                        "DELETE FROM userItem WHERE uid = ? AND item = ?",
-                        (uid, item)
+                        "DELETE FROM userItem WHERE uid = ? AND item = ?", (uid, item)
                     )
                 else:
                     await cls.m_pDB.execute(
                         "UPDATE userItem SET count = ? WHERE uid = ? AND item = ?",
-                        (count, uid, item)
+                        (count, uid, item),
                     )
             return True
         except Exception as e:
-            logger.warning(f"updateUserItemByName失败！", e=e)
+            logger.warning("updateUserItemByName失败！", e=e)
             return False
 
     @classmethod
@@ -136,8 +130,7 @@ class CUserItemDB(CSqlManager):
         try:
             async with cls._transaction():
                 async with cls.m_pDB.execute(
-                    "SELECT count FROM userItem WHERE uid = ? AND item = ?",
-                    (uid, item)
+                    "SELECT count FROM userItem WHERE uid = ? AND item = ?", (uid, item)
                 ) as cursor:
                     row = await cursor.fetchone()
 
@@ -146,20 +139,20 @@ class CUserItemDB(CSqlManager):
                     if newCount <= 0:
                         await cls.m_pDB.execute(
                             "DELETE FROM userItem WHERE uid = ? AND item = ?",
-                            (uid, item)
+                            (uid, item),
                         )
                     else:
                         await cls.m_pDB.execute(
                             "UPDATE userItem SET count = ? WHERE uid = ? AND item = ?",
-                            (newCount, uid, item)
+                            (newCount, uid, item),
                         )
                 else:
                     if count > 0:
                         await cls.m_pDB.execute(
                             "INSERT INTO userItem (uid, item, count) VALUES (?, ?, ?)",
-                            (uid, item, count)
+                            (uid, item, count),
                         )
             return True
         except Exception as e:
-            logger.warning(f"addUserItemByUid失败！", e=e)
+            logger.warning("addUserItemByUid失败！", e=e)
             return False

@@ -1,5 +1,3 @@
-from typing import Optional
-
 from zhenxun.services.log import logger
 
 from .database import CSqlManager
@@ -9,10 +7,10 @@ class CUserSeedDB(CSqlManager):
     @classmethod
     async def initDB(cls):
         userSeed = {
-            "uid": "TEXT NOT NULL",                 #用户Uid
-            "seed": "TEXT NOT NULL",                #种子名称
-            "count": "INTEGER NOT NULL DEFAULT 0",  #数量
-            "PRIMARY KEY": "(uid, seed)"
+            "uid": "TEXT NOT NULL",  # 用户Uid
+            "seed": "TEXT NOT NULL",  # 种子名称
+            "count": "INTEGER NOT NULL DEFAULT 0",  # 数量
+            "PRIMARY KEY": "(uid, seed)",
         }
 
         await cls.ensureTableSchema("userSeed", userSeed)
@@ -32,8 +30,7 @@ class CUserSeedDB(CSqlManager):
         try:
             async with cls._transaction():
                 async with cls.m_pDB.execute(
-                    "SELECT count FROM userSeed WHERE uid = ? AND seed = ?",
-                    (uid, seed)
+                    "SELECT count FROM userSeed WHERE uid = ? AND seed = ?", (uid, seed)
                 ) as cursor:
                     row = await cursor.fetchone()
 
@@ -41,23 +38,22 @@ class CUserSeedDB(CSqlManager):
                     newCount = row[0] + count
                     await cls.m_pDB.execute(
                         "UPDATE userSeed SET count = ? WHERE uid = ? AND seed = ?",
-                        (newCount, uid, seed)
+                        (newCount, uid, seed),
                     )
                 else:
                     newCount = count
                     await cls.m_pDB.execute(
                         "INSERT INTO userSeed (uid, seed, count) VALUES (?, ?, ?)",
-                        (uid, seed, count)
+                        (uid, seed, count),
                     )
 
                 if newCount <= 0:
                     await cls.m_pDB.execute(
-                        "DELETE FROM userSeed WHERE uid = ? AND seed = ?",
-                        (uid, seed)
+                        "DELETE FROM userSeed WHERE uid = ? AND seed = ?", (uid, seed)
                     )
             return True
         except Exception as e:
-            logger.warning(f"addUserSeedByUid 失败！", e=e)
+            logger.warning("addUserSeedByUid 失败！", e=e)
             return False
 
     @classmethod
@@ -72,7 +68,7 @@ class CUserSeedDB(CSqlManager):
             else:
                 await cls.m_pDB.execute(
                     "INSERT INTO userSeed (uid, seed, count) VALUES (?, ?, ?)",
-                    (uid, seed, newCount)
+                    (uid, seed, newCount),
                 )
 
             if newCount <= 0:
@@ -80,12 +76,11 @@ class CUserSeedDB(CSqlManager):
 
             return True
         except Exception as e:
-            logger.warning(f"_addUserSeedByUid 失败！", e=e)
+            logger.warning("_addUserSeedByUid 失败！", e=e)
             return False
 
-
     @classmethod
-    async def getUserSeedByName(cls, uid: str, seed: str) -> Optional[int]:
+    async def getUserSeedByName(cls, uid: str, seed: str) -> int | None:
         """根据种子名称获取种子数量
 
         Args:
@@ -98,13 +93,12 @@ class CUserSeedDB(CSqlManager):
 
         try:
             async with cls.m_pDB.execute(
-                "SELECT count FROM userSeed WHERE uid = ? AND seed = ?",
-                (uid, seed)
+                "SELECT count FROM userSeed WHERE uid = ? AND seed = ?", (uid, seed)
             ) as cursor:
                 row = await cursor.fetchone()
                 return row[0] if row else None
         except Exception as e:
-            logger.warning(f"getUserSeedByName 查询失败！", e=e)
+            logger.warning("getUserSeedByName 查询失败！", e=e)
             return None
 
     @classmethod
@@ -119,8 +113,7 @@ class CUserSeedDB(CSqlManager):
         """
 
         cursor = await cls.m_pDB.execute(
-            "SELECT seed, count FROM userSeed WHERE uid=?",
-            (uid,)
+            "SELECT seed, count FROM userSeed WHERE uid=?", (uid,)
         )
         rows = await cursor.fetchall()
         return {row["seed"]: row["count"] for row in rows}
@@ -144,11 +137,11 @@ class CUserSeedDB(CSqlManager):
             async with cls._transaction():
                 await cls.m_pDB.execute(
                     "UPDATE userSeed SET count = ? WHERE uid = ? AND seed = ?",
-                    (count, uid, seed)
+                    (count, uid, seed),
                 )
             return True
         except Exception as e:
-            logger.warning(f"updateUserSeedByName失败！", e=e)
+            logger.warning("updateUserSeedByName失败！", e=e)
             return False
 
     @classmethod
@@ -170,11 +163,11 @@ class CUserSeedDB(CSqlManager):
             async with cls._transaction():
                 await cls.m_pDB.execute(
                     "UPDATE userSeed SET count = ? WHERE uid = ? AND seed = ?",
-                    (count, uid, seed)
+                    (count, uid, seed),
                 )
             return True
         except Exception as e:
-            logger.warning(f"updateUserSeedByName失败！", e=e)
+            logger.warning("updateUserSeedByName失败！", e=e)
             return False
 
     @classmethod
@@ -191,12 +184,11 @@ class CUserSeedDB(CSqlManager):
         try:
             async with cls._transaction():
                 await cls.m_pDB.execute(
-                    "DELETE FROM userSeed WHERE uid = ? AND seed = ?",
-                    (uid, seed)
+                    "DELETE FROM userSeed WHERE uid = ? AND seed = ?", (uid, seed)
                 )
             return True
         except Exception as e:
-            logger.warning(f"deleteUserSeedByName 删除失败！", e=e)
+            logger.warning("deleteUserSeedByName 删除失败！", e=e)
             return False
 
     @classmethod
@@ -212,10 +204,9 @@ class CUserSeedDB(CSqlManager):
         """
         try:
             await cls.m_pDB.execute(
-                "DELETE FROM userSeed WHERE uid = ? AND seed = ?",
-                (uid, seed)
+                "DELETE FROM userSeed WHERE uid = ? AND seed = ?", (uid, seed)
             )
             return True
         except Exception as e:
-            logger.warning(f"deleteUserSeedByName 删除失败！", e=e)
+            logger.warning("deleteUserSeedByName 删除失败！", e=e)
             return False

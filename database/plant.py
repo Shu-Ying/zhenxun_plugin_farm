@@ -1,8 +1,5 @@
-import ast
 import os
-import re
 from contextlib import asynccontextmanager
-from unittest import result
 
 import aiosqlite
 
@@ -29,7 +26,9 @@ class CPlantManager:
             _ = os.path.exists(g_sPlantPath)
 
             if g_bIsDebug:
-                cls.m_pDB = await aiosqlite.connect(str(g_sPlantPath.parent / "plant-test.db"))
+                cls.m_pDB = await aiosqlite.connect(
+                    str(g_sPlantPath.parent / "plant-test.db")
+                )
             else:
                 cls.m_pDB = await aiosqlite.connect(str(g_sPlantPath))
 
@@ -73,7 +72,6 @@ class CPlantManager:
             logger.warning(f"数据库语句执行出错: {command}", e=e)
             return False
 
-
     @classmethod
     async def getPlantByName(cls, name: str) -> dict | None:
         """根据作物名称查询记录
@@ -113,7 +111,7 @@ class CPlantManager:
                 if not row:
                     return []
 
-                phase = row[0].split(',')
+                phase = row[0].split(",")
 
                 seen = set()
                 result = []
@@ -149,9 +147,9 @@ class CPlantManager:
                 if not row:
                     return -1
 
-                phase = row[0].split(',')
+                phase = row[0].split(",")
 
-                #去重
+                # 去重
                 seen = set()
                 result = []
                 for x in phase:
@@ -184,7 +182,7 @@ class CPlantManager:
                 if not row:
                     return -1
 
-                phase = row[0].split(',')
+                phase = row[0].split(",")
                 again = phase[-1] - phase[3] / 60 / 60
 
                 return again
@@ -241,7 +239,9 @@ class CPlantManager:
     async def listPlants(cls) -> list[dict]:
         """查询所有作物记录"""
         try:
-            async with cls.m_pDB.execute("SELECT * FROM plant ORDER BY level") as cursor:
+            async with cls.m_pDB.execute(
+                "SELECT * FROM plant ORDER BY level"
+            ) as cursor:
                 rows = await cursor.fetchall()
                 return [dict(r) for r in rows]
         except Exception as e:

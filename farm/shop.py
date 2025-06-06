@@ -1,19 +1,15 @@
 import math
-import plistlib
-from itertools import islice
 
 from zhenxun.services.log import logger
-from zhenxun.utils._build_image import BuildImage
 from zhenxun.utils.image_utils import ImageTemplate
 
-from ..config import g_sResourcePath
+from ..config import g_sResourcePath, g_sTranslation
 from ..dbService import g_pDBService
-from ..json import g_pJsonManager
 
 
 class CShopManager:
     @classmethod
-    async def getSeedShopImage(cls, filterKey: str|int = 1, num: int = 1) -> bytes:
+    async def getSeedShopImage(cls, filterKey: str | int = 1, num: int = 1) -> bytes:
         """获取商店页面
 
         Args:
@@ -44,7 +40,7 @@ class CShopManager:
             "收获数量",
             "成熟时间（小时）",
             "收获次数",
-            "是否可以上架交易行"
+            "是否可以上架交易行",
         ]
 
         # 查询所有可购买作物，并根据筛选关键字过滤
@@ -52,10 +48,10 @@ class CShopManager:
         filteredPlants = []
         for plant in plants:
             # 跳过未解锁购买的种子
-            if plant['isBuy'] == 0:
+            if plant["isBuy"] == 0:
                 continue
             # 字符串筛选
-            if filterStr and filterStr not in plant['name']:
+            if filterStr and filterStr not in plant["name"]:
                 continue
             filteredPlants.append(plant)
 
@@ -63,7 +59,7 @@ class CShopManager:
         totalCount = len(filteredPlants)
         pageCount = math.ceil(totalCount / 15) if totalCount else 1
         startIndex = (page - 1) * 15
-        pageItems = filteredPlants[startIndex: startIndex + 15]
+        pageItems = filteredPlants[startIndex : startIndex + 15]
 
         # 构建数据行
         dataList = []
@@ -75,20 +71,22 @@ class CShopManager:
                 icon = (iconPath, 33, 33)
 
             # 交易行标记
-            sell = "可以" if plant['sell'] else "不可以"
+            sell = "可以" if plant["sell"] else "不可以"
 
-            dataList.append([
-                icon,
-                plant['name'],          # 种子名称
-                plant['buy'],           # 种子单价
-                plant['level'],         # 解锁等级
-                plant['price'],         # 果实单价
-                plant['experience'],    # 收获经验
-                plant['harvest'],       # 收获数量
-                plant['time'],          # 成熟时间（小时）
-                plant['crop'],          # 收获次数
-                sell                    # 是否可上架交易行
-            ])
+            dataList.append(
+                [
+                    icon,
+                    plant["name"],  # 种子名称
+                    plant["buy"],  # 种子单价
+                    plant["level"],  # 解锁等级
+                    plant["price"],  # 果实单价
+                    plant["experience"],  # 收获经验
+                    plant["harvest"],  # 收获数量
+                    plant["time"],  # 成熟时间（小时）
+                    plant["crop"],  # 收获次数
+                    sell,  # 是否可上架交易行
+                ]
+            )
 
         # 页码标题
         title = f"种子商店 页数: {page}/{pageCount}"
@@ -101,7 +99,6 @@ class CShopManager:
             dataList,
         )
         return result.pic2bytes()
-
 
     @classmethod
     async def buySeed(cls, uid: str, name: str, num: int = 1) -> str:
@@ -117,31 +114,35 @@ class CShopManager:
         """
 
         if num <= 0:
-            return "请输入购买数量！"
+            return g_sTranslation["buySeed"]["notNum"]
 
         plantInfo = await g_pDBService.plant.getPlantByName(name)
         if not plantInfo:
-            return "购买出错！请检查需购买的种子名称！"
+            return g_sTranslation["buySeed"]["error"]
 
         level = await g_pDBService.user.getUserLevelByUid(uid)
 
-        if level[0] < int(plantInfo['level']):
-            return "你的等级不够哦，努努力吧"
+        if level[0] < int(plantInfo["level"]):
+            return g_sTranslation["buySeed"]["noLevel"]
 
         point = await g_pDBService.user.getUserPointByUid(uid)
-        total = int(plantInfo['buy']) * num
+        total = int(plantInfo["buy"]) * num
 
-        logger.debug(f"用户：{uid}购买{name}，数量为{num}。用户农场币为{point}，购买需要{total}")
+        logger.debug(
+            f"用户：{uid}购买{name}，数量为{num}。用户农场币为{point}，购买需要{total}"
+        )
 
         if point < total:
-            return "你的农场币不够哦~ 快速速氪金吧！"
+            return g_sTranslation["buySeed"]["noPoint"]
         else:
             await g_pDBService.user.updateUserPointByUid(uid, point - total)
 
             if not await g_pDBService.userSeed.addUserSeedByUid(uid, name, num):
-                return "购买失败，执行数据库错误！"
+                return g_sTranslation["buySeed"]["errorSql"]
 
-            return f"成功购买{name}，花费{total}农场币, 剩余{point - total}农场币"
+            return g_sTranslation["buySeed"]["success"].format(
+                name=name, total=total, point=point - total
+            )
 
     @classmethod
     async def sellPlantByUid(cls, uid: str, name: str = "", num: int = 1) -> str:
@@ -158,11 +159,11 @@ class CShopManager:
 
         plant = await g_pDBService.userPlant.getUserPlantByUid(uid)
         if not plant:
-            return "你仓库没有可以出售的作物"
+            return g_sTranslation["sellPlant"]["no"]
 
         point = 0
         totalSold = 0
-        isAll = (num == -1)
+        isAll = num == -1
 
         if name == "":
             for plantName, count in plant.items():
@@ -170,16 +171,18 @@ class CShopManager:
                 if not plantInfo:
                     continue
 
-                point += plantInfo['price'] * count
+                point += plantInfo["price"] * count
                 await g_pDBService.userPlant.updateUserPlantByName(uid, plantName, 0)
         else:
             if name not in plant:
-                return f"出售作物{name}出错：仓库中不存在该作物"
+                return g_sTranslation["sellPlant"]["error"].format(name=name)
             available = plant[name]
             sellAmount = available if isAll else min(available, num)
             if sellAmount <= 0:
-                return f"出售作物{name}出错：数量不足"
-            await g_pDBService.userPlant.updateUserPlantByName(uid, name, available - sellAmount)
+                return g_sTranslation["sellPlant"]["error1"].format(name=name)
+            await g_pDBService.userPlant.updateUserPlantByName(
+                uid, name, available - sellAmount
+            )
             totalSold = sellAmount
 
         if name == "":
@@ -189,7 +192,7 @@ class CShopManager:
             if not plantInfo:
                 price = 0
             else:
-                price = plantInfo['price']
+                price = plantInfo["price"]
 
             totalPoint = totalSold * price
 
@@ -197,8 +200,13 @@ class CShopManager:
         await g_pDBService.user.updateUserPointByUid(uid, currentPoint + totalPoint)
 
         if name == "":
-            return f"成功出售所有作物，获得农场币：{totalPoint}，当前农场币：{currentPoint + totalPoint}"
+            return g_sTranslation["sellPlant"]["success"].format(
+                point=totalPoint, num=currentPoint + totalPoint
+            )
         else:
-            return f"成功出售{name}，获得农场币：{totalPoint}，当前农场币：{currentPoint + totalPoint}"
+            return g_sTranslation["sellPlant"]["success1"].format(
+                name=name, point=totalPoint, num=currentPoint + totalPoint
+            )
+
 
 g_pShopManager = CShopManager()

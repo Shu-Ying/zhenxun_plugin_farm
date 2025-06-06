@@ -3,9 +3,146 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 
 from zhenxun.services.log import logger
+from zhenxun.utils.message import MessageUtils
+
+from .dbService import g_pDBService
 
 
 class CToolManager:
+    @classmethod
+    async def isRegisteredByUid(cls, uid: str) -> bool:
+        result = await g_pDBService.user.isUserExist(uid)
+
+        if not result:
+            await MessageUtils.build_message(
+                "尚未开通农场，快at我发送 开通农场 开通吧"
+            ).send()
+            return False
+
+        return True
+
+    @classmethod
+    def sanitize_username(cls, username: str, max_length: int = 15) -> str:
+        """
+        安全处理用户名
+        功能：
+        1. 移除首尾空白
+        2. 过滤危险字符
+        3. 转义单引号
+        4. 处理空值
+        5. 限制长度
+        """
+        # 处理空值
+        if not username:
+            return "神秘农夫"
+
+        # 基础清洗
+        cleaned = username.strip()
+
+        # 允许的字符白名单（可自定义扩展）
+        safe_chars = {
+            "_",
+            "-",
+            "!",
+            "@",
+            "#",
+            "$",
+            "%",
+            "^",
+            "&",
+            "*",
+            "(",
+            ")",
+            "+",
+            "=",
+            ".",
+            ",",
+            "~",
+            "·",
+            " ",
+            "a",
+            "b",
+            "c",
+            "d",
+            "e",
+            "f",
+            "g",
+            "h",
+            "i",
+            "j",
+            "k",
+            "l",
+            "m",
+            "n",
+            "o",
+            "p",
+            "q",
+            "r",
+            "s",
+            "t",
+            "u",
+            "v",
+            "w",
+            "x",
+            "y",
+            "z",
+            "A",
+            "B",
+            "C",
+            "D",
+            "E",
+            "F",
+            "G",
+            "H",
+            "I",
+            "J",
+            "K",
+            "L",
+            "M",
+            "N",
+            "O",
+            "P",
+            "Q",
+            "R",
+            "S",
+            "T",
+            "U",
+            "V",
+            "W",
+            "X",
+            "Y",
+            "Z",
+            "0",
+            "1",
+            "2",
+            "3",
+            "4",
+            "5",
+            "6",
+            "7",
+            "8",
+            "9",
+        }
+        # 添加常用中文字符（Unicode范围）
+        safe_chars.update(chr(c) for c in range(0x4E00, 0x9FFF + 1))
+
+        # 过滤危险字符
+        filtered = [
+            c if c in safe_chars or 0x4E00 <= ord(c) <= 0x9FFF else "" for c in cleaned
+        ]
+
+        # 合并处理结果
+        safe_str = "".join(filtered)
+
+        # 转义单引号（双重保障）
+        escaped = safe_str.replace("'", "''")
+
+        # 处理空结果
+        if not escaped:
+            return "神秘农夫"
+
+        # 长度限制
+        return escaped[:max_length]
 
     @classmethod
     def renameFile(cls, currentFilePath: str, newFileName: str) -> bool:
@@ -35,5 +172,6 @@ class CToolManager:
     def dateTime(cls) -> datetime:
         tz = ZoneInfo("Asia/Shanghai")
         return datetime.now(tz)
+
 
 g_pToolManager = CToolManager()

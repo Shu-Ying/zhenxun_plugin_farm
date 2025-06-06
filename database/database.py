@@ -1,4 +1,3 @@
-import math
 import os
 import re
 from contextlib import asynccontextmanager
@@ -13,9 +12,9 @@ from ..config import g_sDBFilePath, g_sDBPath
 
 class CSqlManager:
     def __init__(self):
-            dbPath = Path(g_sDBPath)
-            if dbPath and not dbPath.exists():
-                os.makedirs(dbPath, exist_ok=True)
+        dbPath = Path(g_sDBPath)
+        if dbPath and not dbPath.exists():
+            os.makedirs(dbPath, exist_ok=True)
 
     @classmethod
     async def cleanup(cls):
@@ -46,7 +45,7 @@ class CSqlManager:
 
     @classmethod
     async def getTableInfo(cls, tableName: str) -> list:
-        if not re.match(r'^[A-Za-z_][A-Za-z0-9_]*$', tableName):
+        if not re.match(r"^[A-Za-z_][A-Za-z0-9_]*$", tableName):
             raise ValueError(f"Illegal table name: {tableName}")
         try:
             cursor = await cls.m_pDB.execute(f'PRAGMA table_info("{tableName}")')
@@ -70,7 +69,7 @@ class CSqlManager:
         """
 
         info = await cls.getTableInfo(tableName)
-        existing = {col['name']: col['type'].upper() for col in info}
+        existing = {col["name"]: col["type"].upper() for col in info}
         desired = {k: v.upper() for k, v in columns.items() if k != "PRIMARY KEY"}
         primaryKey = columns.get("PRIMARY KEY", "")
 
@@ -83,7 +82,9 @@ class CSqlManager:
 
         toAdd = [k for k in desired if k not in existing]
         toRemove = [k for k in existing if k not in desired]
-        typeMismatch = [k for k in desired if k in existing and existing[k] != desired[k]]
+        typeMismatch = [
+            k for k in desired if k in existing and existing[k] != desired[k]
+        ]
 
         if toAdd and not toRemove and not typeMismatch:
             for col in toAdd:
@@ -106,7 +107,9 @@ class CSqlManager:
                     f'INSERT INTO "{tmpTable}" ({colsStr}) SELECT {colsStr} FROM "{tableName}";'
                 )
             await cls.m_pDB.execute(f'DROP TABLE "{tableName}";')
-            await cls.m_pDB.execute(f'ALTER TABLE "{tmpTable}" RENAME TO "{tableName}";')
+            await cls.m_pDB.execute(
+                f'ALTER TABLE "{tmpTable}" RENAME TO "{tableName}";'
+            )
         return True
 
     @classmethod
@@ -130,5 +133,6 @@ class CSqlManager:
         except Exception as e:
             logger.warning(f"数据库语句执行出错: {command}", e=e)
             return False
+
 
 g_pSqlManager = CSqlManager()

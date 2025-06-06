@@ -39,7 +39,7 @@ __plugin_meta__ = PluginMetadata(
     """.strip(),
     extra=PluginExtraData(
         author="Art_Sakura",
-        version="1.4.2",
+        version="1.4.3",
         commands=[Command(command="我的农场")],
         menu_type="群内小游戏",
         configs=[
@@ -66,8 +66,8 @@ __plugin_meta__ = PluginMetadata(
                 value="http://diuse.work",
                 help="签到、交易行、活动等服务器地址",
                 default_value="http://diuse.work",
-            )
-        ]
+            ),
+        ],
     ).to_dict(),
 )
 driver = get_driver()
@@ -84,6 +84,7 @@ async def start():
 
     await g_pDBService.init()
 
+
 # 析构函数
 @driver.on_shutdown
 async def shutdown():
@@ -92,12 +93,7 @@ async def shutdown():
     await g_pDBService.cleanup()
 
 
-@scheduler.scheduled_job(
-    trigger="cron",
-    hour=0,
-    minute=30,
-    id="signInFile"
-)
+@scheduler.scheduled_job(trigger="cron", hour=0, minute=30, id="signInFile")
 async def signInFile():
     try:
         await g_pJsonManager.initSignInFile()
