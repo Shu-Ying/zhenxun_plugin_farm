@@ -225,11 +225,11 @@ class CUserDB(CSqlManager):
 
     @classmethod
     async def updateUserVipPointByUid(cls, uid: str, vipPoint: int) -> bool:
-        """根据用户Uid更新农场币数量
+        """根据用户Uid更新点券数量
 
         Args:
             uid (str): 用户Uid
-            vipPoint (int): 新农场币数量
+            vipPoint (int): 新点券数量
 
         Returns:
             bool: 是否更新成功
@@ -300,7 +300,8 @@ class CUserDB(CSqlManager):
             uid (str): 用户Uid
 
         Returns:
-            tuple[int, int, int]: (当前等级, 升至下级还需经验, 当前等级已获经验)，失败返回(-1, -1, -1)
+            tuple[int, int, int]: 成功返回(当前等级, 升至下级还需经验, 当前等级已获经验)
+            失败返回(-1, -1, -1)
         """
         if not uid:
             return -1, -1, -1

@@ -68,6 +68,35 @@ class CUserSoilDB(CSqlManager):
         )
 
     @classmethod
+    async def matureNow(cls, uid: str, soilIndex: int):
+        """将指定地块的作物直接成熟
+
+        Args:
+            uid (str): 用户ID
+            soilIndex (int): 地块索引（从1开始）
+        """
+        # 与 nextPhase 不同：无需调试模式检查，允许在任何模式下调用
+        soilInfo = await cls.getUserSoil(uid, soilIndex)
+        if not soilInfo:
+            return
+
+        plantName = soilInfo.get("plantName")
+        if not plantName:
+            return
+
+        plantInfo = await g_pDBService.plant.getPlantByName(plantName)
+        if not plantInfo:
+            return
+
+        currentTime = g_pToolManager.dateTime().now().timestamp()
+        # 如果当前时间已经超过或等于成熟时间，则作物已成熟或可收获
+        if currentTime >= soilInfo["matureTime"]:
+            return
+
+        # 将作物成熟时间直接更新为当前时间，实现立即成熟
+        await cls.updateUserSoilFields(uid, soilIndex, {"matureTime": currentTime})
+
+    @classmethod
     async def getUserFarmByUid(cls, uid: str) -> dict:
         """获取指定用户的旧农场数据
 
@@ -248,6 +277,25 @@ class CUserSoilDB(CSqlManager):
         return dict(zip(columns, row))
 
     @classmethod
+    async def countSoilByLevel(cls, uid: str, soilLevel: int) -> int:
+        """统计指定用户在指定土地等级的土地数量
+
+        Args:
+            uid (str): 用户ID
+            soilLevel (int): 土地等级
+
+        Returns:
+            int: 符合条件的土地数量
+        """
+        async with cls._transaction():
+            cursor = await cls.m_pDB.execute(
+                "SELECT COUNT(*) FROM userSoil WHERE uid = ? AND soilLevel = ?",
+                (uid, soilLevel),
+            )
+            row = await cursor.fetchone()
+            return row[0] if row else 0
+
+    @classmethod
     async def updateUserSoil(cls, uid: str, soilIndex: int, field: str, value):
         """更新指定用户土地的单个字段
 
@@ -393,8 +441,8 @@ class CUserSoilDB(CSqlManager):
             bool: 播种成功返回 True，否则返回 False
         """
         # 校验土地区是否已种植
-        soilRecord = await cls.getUserSoil(uid, soilIndex)
-        if soilRecord and soilRecord.get("plantName"):
+        soilInfo = await cls.getUserSoil(uid, soilIndex)
+        if not soilInfo:
             return False
 
         # 获取植物配置
@@ -404,11 +452,18 @@ class CUserSoilDB(CSqlManager):
             return False
 
         nowTs = int(g_pToolManager.dateTime().now().timestamp())
-        matureTs = nowTs + int(plantCfg.get("time", 0)) * 3600
+
+        time = int(plantCfg.get("time", 0))
+        percent = await cls.getSoilLevelTime(soilInfo.get("soilLevel", 0))
+
+        # 处理土地等级带来的时间缩短
+        time = time * (100 + percent) // 100
+
+        matureTs = nowTs + time * 3600
 
         try:
             async with cls._transaction():
-                prev = soilRecord or {}
+                prev = soilInfo or {}
                 await cls._deleteUserSoil(uid, soilIndex)
                 await cls._insertUserSoil(
                     {
@@ -457,3 +512,90 @@ class CUserSoilDB(CSqlManager):
             status.append("缺水")
 
         return ",".join(status)
+
+    @classmethod
+    async def getSoilLevel(cls, level: int) -> str:
+        """获取土地等级英文文本
+
+        Args:
+            level (int): 土地等级
+
+        Returns:
+            str:
+        """
+        if level == 1:
+            return "red"
+        elif level == 2:
+            return "black"
+        elif level == 3:
+            return "gold"
+
+        return "default"
+
+    @classmethod
+    async def getSoilLevelText(cls, level: int) -> str:
+        """获取土地等级中文文本
+
+        Args:
+            level (int): 土地等级
+
+        Returns:
+            str:
+        """
+        if level == 1:
+            return "红土地"
+        elif level == 2:
+            return "黑土地"
+        elif level == 3:
+            return "金土地"
+
+        return "草土地"
+
+    @classmethod
+    async def getSoilLevelHarvestNumber(cls, level: int) -> int:
+        """获取土地等级收获数量增加比例
+
+        Args:
+            level (int): 土地等级
+
+        Returns:
+            int:
+        """
+        if level == 2:
+            return 20
+        elif level == 3:
+            return 28
+
+        return 10
+
+    @classmethod
+    async def getSoilLevelHarvestExp(cls, level: int) -> int:
+        """获取土地等级收获经验增加比例
+
+        Args:
+            level (int): 土地等级
+
+        Returns:
+            int:
+        """
+        if level == 3:
+            return 28
+
+        return 0
+
+    @classmethod
+    async def getSoilLevelTime(cls, level: int) -> int:
+        """获取土地等级播种减少时间消耗
+
+        Args:
+            level (int): 土地等级
+
+        Returns:
+            int:
+        """
+        if level == 2:
+            return 20
+        elif level == 3:
+            return 20
+
+        return 0

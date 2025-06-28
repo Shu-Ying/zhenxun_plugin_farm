@@ -26,6 +26,9 @@ g_sConfigPath = Path(__file__).resolve().parent / "config"
 # 农场签到文件路径
 g_sSignInPath = g_sConfigPath / "sign_in.json"
 
+# 土地等级上限
+g_iSoilLevelMax = 3
+
 # 农场同一文本
 g_sTranslation = {
     "basic": {
@@ -105,5 +108,17 @@ g_sTranslation = {
         "grandTotal2": "\n🌱 获得{name}种子 * {num} 🌟",
         "error": "❗️ 签到功能异常！",
         "error1": "❌ 签到失败！未知错误 💔",
+    },
+    "soilInfo": {
+        "success": "土地成功升级至{name}，效果为：{text}",
+        "timeOut": "等待土地升级回复超时，请重试",
+        "error": "土地信息尚未查询到",
+        "error1": "该土地已经升至满级啦~",
+        "red": "增产+10%",
+        "black": "增产+20% 时间-20%",
+        "gold": "增产+28% 经验+28% 时间-20%",
+        "amethyst": "增产+30% 经验+30% 时间-25% 幸运+1%",
+        "aquamarine": "增产+32% 经验+32% 时间-28% 幸运+1%",
+        "blackcrystal": "增产+32% 经验+40% 时间-28% 幸运+2%",
     },
 }

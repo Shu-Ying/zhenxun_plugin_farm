@@ -9,7 +9,7 @@ from zhenxun.utils.enum import GoldHandle
 from zhenxun.utils.image_utils import ImageTemplate
 from zhenxun.utils.platform import PlatformUtils
 
-from ..config import g_bIsDebug, g_sResourcePath, g_sTranslation
+from ..config import g_bIsDebug, g_iSoilLevelMax, g_sResourcePath, g_sTranslation
 from ..dbService import g_pDBService
 from ..event.event import g_pEventManager
 from ..json import g_pJsonManager
@@ -37,7 +37,7 @@ class CFarmManager:
 
         await UserConsole.reduce_gold(
             uid, num, GoldHandle.PLUGIN, "zhenxun_plugin_farm"
-        )  # type: ignore
+        )
         await UserConsole.reduce_gold(
             uid, fee, GoldHandle.PLUGIN, "zhenxun_plugin_farm"
         )  # type: ignore
@@ -65,10 +65,6 @@ class CFarmManager:
 
         soilSize = g_pJsonManager.m_pSoil["size"]
 
-        # TODO 缺少判断用户土地资源状况
-        soil = BuildImage(background=g_sResourcePath / "soil/普通土地.png")
-        await soil.resize(0, soilSize[0], soilSize[1])
-
         grass = BuildImage(background=g_sResourcePath / "soil/草土地.png")
         await grass.resize(0, soilSize[0], soilSize[1])
 
@@ -88,6 +84,27 @@ class CFarmManager:
 
             # 如果土地已经到达对应等级
             if index < soilUnlock:
+                soilUrl = ""
+                # TODO 缺少判断用户土地资源状况
+                soilInfo = await g_pDBService.userSoil.getUserSoil(uid, index)
+
+                if not soilInfo:
+                    soilUrl = "soil/普通土地.png"
+                else:
+                    soilLevel = soilInfo.get("soilLevel", 0)
+
+                    if soilLevel == 1:
+                        soilUrl = "soil/红土地.png"
+                    elif soilLevel == 2:
+                        soilUrl = "soil/黑土地.png"
+                    elif soilLevel == 3:
+                        soilUrl = "soil/金土地.png"
+                    else:
+                        soilUrl = "soil/普通土地.png"
+
+                soil = BuildImage(background=g_sResourcePath / soilUrl)
+                await soil.resize(0, soilSize[0], soilSize[1])
+
                 await img.paste(soil, (x, y))
 
                 isPlant, plant, isRipe, offsetX, offsetY = await cls.drawSoilPlant(
@@ -211,6 +228,7 @@ class CFarmManager:
         columnName = [
             "-",
             "土地ID",
+            "土地等级",
             "作物名称",
             "成熟时间",
             "土地状态",
@@ -226,7 +244,7 @@ class CFarmManager:
 
             if soilInfo:
                 if soilInfo["soilLevel"] == 1:
-                    iconPath = g_sResourcePath / "soil/TODO.png"
+                    iconPath = g_sResourcePath / "soil/红土地.png"
                 else:
                     iconPath = g_sResourcePath / "soil/普通土地.png"
 
@@ -262,6 +280,9 @@ class CFarmManager:
                     [
                         icon,
                         i,
+                        await g_pDBService.userSoil.getSoilLevelText(
+                            soilInfo["soilLevel"]
+                        ),
                         plantName,
                         matureTime,
                         soilStatus,
@@ -344,8 +365,11 @@ class CFarmManager:
             return True, plant, True, offsetX, offsetY
         else:
             # 如果是多阶段作物 且没有成熟 #早期思路 多阶段作物 直接是倒数第二阶段图片
-            # if soilInfo['harvestCount'] >= 1:
-            #     plant = BuildImage(background = g_sResourcePath / f"plant/{soilInfo['plantName']}/{plantInfo['phase'] - 1s}.png")
+            # if soilInfo["harvestCount"] >= 1:
+            #     plant = BuildImage(
+            #         background=g_sResourcePath
+            #         / f"plant/{soilInfo['plantName']}/{plantInfo['phase'] - 1}.png"
+            #     )
 
             #     return True, plant, False, offsetX, offsetY
 
@@ -466,7 +490,7 @@ class CFarmManager:
                 num = count
 
             # 发送播种前信号
-            await g_pEventManager.m_beforePlant.emit(uid=uid, name=name, num=num)
+            await g_pEventManager.m_beforePlant.emit(uid=uid, name=name, num=num)  # type: ignore
 
             # 记录是否成功播种
             successCount = 0
@@ -484,7 +508,7 @@ class CFarmManager:
                         successCount += 1
 
                         # 发送播种后信号
-                        await g_pEventManager.m_afterPlant.emit(
+                        await g_pEventManager.m_afterPlant.emit(  # type: ignore
                             uid=uid, name=name, soilIndex=i
                         )
 
@@ -513,7 +537,7 @@ class CFarmManager:
             str: 返回
         """
         try:
-            await g_pEventManager.m_beforeHarvest.emit(uid=uid)
+            await g_pEventManager.m_beforeHarvest.emit(uid=uid)  # type: ignore
 
             soilNumber = await g_pDBService.user.getUserSoilByUid(uid)
 
@@ -529,6 +553,8 @@ class CFarmManager:
                 soilInfo = await g_pDBService.userSoil.getUserSoil(uid, i)
                 if not soilInfo:
                     continue
+
+                level = soilInfo.get("soilLevel", 0)
 
                 # 如果是枯萎状态
                 if soilInfo.get("wiltStatus", 1) == 1:
@@ -550,8 +576,13 @@ class CFarmManager:
 
                     # 处理偷菜扣除数量
                     stealNum = await g_pDBService.userSteal.getTotalStolenCount(uid, i)
-
                     number -= stealNum
+
+                    # 处理土地等级带来的数量增长 向下取整
+                    percent = await g_pDBService.userSoil.getSoilLevelHarvestNumber(
+                        level
+                    )
+                    number = number * (100 + percent) // 100
 
                     if number <= 0:
                         continue
@@ -559,11 +590,15 @@ class CFarmManager:
                     harvestCount += 1
                     experience += plantInfo["experience"]
 
+                    # 处理土地等级带来的经验增长 向下取整
+                    percent = await g_pDBService.userSoil.getSoilLevelHarvestExp(level)
+                    experience = experience * (100 + percent) // 100
+
                     harvestRecords.append(
                         g_sTranslation["harvest"]["append"].format(
                             name=soilInfo["plantName"],
                             num=number,
-                            exp=plantInfo["experience"],
+                            exp=experience,
                         )
                     )
 
@@ -597,7 +632,7 @@ class CFarmManager:
                             },
                         )
 
-                    await g_pEventManager.m_afterHarvest.emit(
+                    await g_pEventManager.m_afterHarvest.emit(  # type: ignore
                         uid=uid, name=soilInfo["plantName"], num=number, soilIndex=i
                     )
 
@@ -631,7 +666,7 @@ class CFarmManager:
         """
         soilNumber = await g_pDBService.user.getUserSoilByUid(uid)
 
-        await g_pEventManager.m_beforeEradicate.emit(uid=uid)
+        await g_pEventManager.m_beforeEradicate.emit(uid=uid)  # type: ignore
 
         experience = 0
         for i in range(1, soilNumber + 1):
@@ -658,7 +693,7 @@ class CFarmManager:
             # 铲除作物会将偷菜记录清空
             await g_pDBService.userSteal.deleteStealRecord(uid, i)
 
-            await g_pEventManager.m_afterEradicate.emit(uid=uid, soilIndex=i)
+            await g_pEventManager.m_afterEradicate.emit(uid=uid, soilIndex=i)  # type: ignore
 
         if experience > 0:
             exp = await g_pDBService.user.getUserExpByUid(uid)
@@ -703,7 +738,7 @@ class CFarmManager:
             if icon_path.exists():
                 icon = (icon_path, 33, 33)
 
-            if plantInfo["sell"] == True:
+            if plantInfo["sell"]:
                 sell = "可以"
             else:
                 sell = "不可以"
@@ -863,6 +898,14 @@ class CFarmManager:
 
     @classmethod
     async def reclamationCondition(cls, uid: str) -> str:
+        """获取开垦条件
+
+        Args:
+            uid (str): 用户Uid
+
+        Returns:
+            str: 返回条件文本信息
+        """
         userInfo = await g_pDBService.user.getUserInfoByUid(uid)
         rec = g_pJsonManager.m_pLevel["reclamation"]
 
@@ -892,6 +935,14 @@ class CFarmManager:
 
     @classmethod
     async def reclamation(cls, uid: str) -> str:
+        """开垦
+
+        Args:
+            uid (str): 用户Uid
+
+        Returns:
+            str: _description_
+        """
         userInfo = await g_pDBService.user.getUserInfoByUid(uid)
         level = await g_pDBService.user.getUserLevelByUid(uid)
 
@@ -905,7 +956,7 @@ class CFarmManager:
 
             levelFileter = rec["level"]
             point = rec["point"]
-            item = rec["item"]
+            # item = rec["item"]
 
             if level[0] < levelFileter:
                 return g_sTranslation["reclamation"]["nextLevel"].format(
@@ -922,6 +973,120 @@ class CFarmManager:
             return g_sTranslation["reclamation"]["success"]
         except Exception:
             return g_sTranslation["reclamation"]["error1"]
+
+    @classmethod
+    async def soilUpgradeCondition(cls, uid: str, soilIndex: int) -> str:
+        """获取土地升级条件
+
+        Args:
+            uid (str): 用户Uid
+            soilIndex (str): 土地索引
+
+        Returns:
+            str: 返回土地升级条件
+        """
+        soilInfo = await g_pDBService.userSoil.getUserSoil(uid, soilIndex)
+
+        if not soilInfo:
+            return g_sTranslation["soilInfo"]["error"]
+
+        soilLevel = soilInfo.get("soilLevel", 0) + 1
+        if soilLevel >= g_iSoilLevelMax:
+            return g_sTranslation["soilInfo"]["error1"]
+
+        # 获取用户当前土地 的下一级土地 数量
+        countSoil = await g_pDBService.userSoil.countSoilByLevel(uid, soilLevel)
+
+        # 获取升级所需
+        soilLevelText = await g_pDBService.userSoil.getSoilLevel(soilLevel)
+        fileter = g_pJsonManager.m_pSoil["upgrade"][soilLevelText][countSoil]
+
+        lines = ["升级该土地所需："]
+        fields = [
+            ("level", "等级"),
+            ("point", "金币"),
+            ("vipPoint", "点券"),
+        ]
+        for key, label in fields:
+            value = fileter.get(key, 0)
+            if value > 0:
+                lines.append(f"{label}：{value}")
+
+        items = fileter.get("item", {})
+        for name, qty in items.items():
+            if qty:
+                lines.append(f"{name}：{qty}")
+
+        lines.append("回复“是”将执行升级")
+
+        return "\n".join(lines)
+
+    @classmethod
+    async def soilUpgrade(cls, uid: str, soilIndex: int) -> str:
+        """土地升级
+
+        Args:
+            uid (str): 用户Uid
+            soilIndex (int): 土地索引
+
+        Returns:
+            str:
+        """
+        userInfo = await g_pDBService.user.getUserInfoByUid(uid)
+        soilInfo = await g_pDBService.userSoil.getUserSoil(uid, soilIndex)
+
+        if not soilInfo:
+            return g_sTranslation["soilInfo"]["error"]
+
+        soilLevel = soilInfo.get("soilLevel", 0) + 1
+        if soilLevel >= g_iSoilLevelMax:
+            return g_sTranslation["soilInfo"]["error1"]
+
+        countSoil = await g_pDBService.userSoil.countSoilByLevel(uid, soilLevel)
+
+        soilLevelText = await g_pDBService.userSoil.getSoilLevel(soilLevel)
+        fileter = g_pJsonManager.m_pSoil["upgrade"][soilLevelText][countSoil]
+
+        getters = {
+            "level": (await g_pDBService.user.getUserLevelByUid(uid))[0],
+            "point": userInfo.get("point", 0),
+            "vipPoint": userInfo.get("vipPoint", 0),
+        }
+
+        requirements = {
+            "level": "等级",
+            "point": "金币",
+            "vipPoint": "点券",
+        }
+
+        for key, val in getters.items():
+            need = fileter.get(key, 0)
+            if val < need:
+                return f"你的{requirements[key]}不够哦~"
+
+        # 缺少item判断
+
+        # 更新数据库字段
+        await g_pDBService.userSoil.updateUserSoil(
+            uid, soilIndex, "soilLevel", soilLevel
+        )
+
+        # 如果有作物的话直接成熟
+        await g_pDBService.userSoil.matureNow(uid, soilIndex)
+
+        # 更新数据库字段
+        await g_pDBService.user.updateUserPointByUid(
+            uid, userInfo.get("point", 0) - fileter.get("point", 0)
+        )
+
+        await g_pDBService.user.updateUserPointByUid(
+            uid, userInfo.get("vipPoint", 0) - fileter.get("vipPoint", 0)
+        )
+
+        return g_sTranslation["soilInfo"]["success"].format(
+            name=await g_pDBService.userSoil.getSoilLevelText(soilLevel),
+            text=g_sTranslation["soilInfo"][soilLevelText],
+        )
 
 
 g_pFarmManager = CFarmManager()
