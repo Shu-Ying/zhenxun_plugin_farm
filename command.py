@@ -570,6 +570,9 @@ async def _(session: Uninfo, index: Query[int] = AlconnaQuery("index", 1)):
 
     await MessageUtils.build_message(condition).send(reply_to=True)
 
+    if not condition.startswith("将土地升级至："):
+        return
+
     @waiter(waits=["message"], keep_session=True)
     async def check(event: Event):
         return event.get_plaintext()

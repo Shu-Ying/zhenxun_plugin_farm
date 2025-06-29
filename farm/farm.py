@@ -703,6 +703,7 @@ class CFarmManager:
                     "plantName": "",
                     "plantTime": 0,
                     "matureTime": 0,
+                    "wiltStatus": 0,
                 },
             )
 
