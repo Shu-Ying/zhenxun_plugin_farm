@@ -86,7 +86,7 @@ class CFarmManager:
             if index < soilUnlock:
                 soilUrl = ""
                 # TODO 缺少判断用户土地资源状况
-                soilInfo = await g_pDBService.userSoil.getUserSoil(uid, index)
+                soilInfo = await g_pDBService.userSoil.getUserSoil(uid, index + 1)
 
                 if not soilInfo:
                     soilUrl = "soil/普通土地.png"
@@ -582,7 +582,7 @@ class CFarmManager:
                     percent = await g_pDBService.userSoil.getSoilLevelHarvestNumber(
                         level
                     )
-                    number = number * (100 + percent) // 100
+                    number = math.floor(number * (100 + percent) // 100)
 
                     if number <= 0:
                         continue
@@ -592,13 +592,13 @@ class CFarmManager:
 
                     # 处理土地等级带来的经验增长 向下取整
                     percent = await g_pDBService.userSoil.getSoilLevelHarvestExp(level)
-                    experience = experience * (100 + percent) // 100
+                    experience = math.floor(experience * (100 + percent) // 100)
 
                     harvestRecords.append(
                         g_sTranslation["harvest"]["append"].format(
                             name=soilInfo["plantName"],
                             num=number,
-                            exp=experience,
+                            exp=plantInfo["experience"],
                         )
                     )
 
@@ -687,8 +687,18 @@ class CFarmManager:
             if g_bIsDebug:
                 experience += 999
 
-            # 批量更新数据库操作
+            # 更新数据库操作
             await g_pDBService.userSoil.deleteUserSoil(uid, i)
+
+            await g_pDBService.userSoil.updateUserSoilFields(
+                uid,
+                i,
+                {
+                    "plantName": "",
+                    "plantTime": 0,
+                    "matureTime": 0,
+                },
+            )
 
             # 铲除作物会将偷菜记录清空
             await g_pDBService.userSteal.deleteStealRecord(uid, i)
@@ -1001,7 +1011,9 @@ class CFarmManager:
         soilLevelText = await g_pDBService.userSoil.getSoilLevel(soilLevel)
         fileter = g_pJsonManager.m_pSoil["upgrade"][soilLevelText][countSoil]
 
-        lines = ["升级该土地所需："]
+        nextLevel = await g_pDBService.userSoil.getSoilLevelText(soilLevel)
+
+        lines = ["将土地升级至：" + nextLevel + "。", "所需："]
         fields = [
             ("level", "等级"),
             ("point", "金币"),
@@ -1075,13 +1087,11 @@ class CFarmManager:
         await g_pDBService.userSoil.matureNow(uid, soilIndex)
 
         # 更新数据库字段
-        await g_pDBService.user.updateUserPointByUid(
-            uid, userInfo.get("point", 0) - fileter.get("point", 0)
-        )
+        point = userInfo.get("point", 0) - fileter.get("point", 0)
+        await g_pDBService.user.updateUserPointByUid(uid, point)
 
-        await g_pDBService.user.updateUserPointByUid(
-            uid, userInfo.get("vipPoint", 0) - fileter.get("vipPoint", 0)
-        )
+        vipPoint = userInfo.get("vipPoint", 0) - fileter.get("vipPoint", 0)
+        await g_pDBService.user.updateUserVipPointByUid(uid, vipPoint)
 
         return g_sTranslation["soilInfo"]["success"].format(
             name=await g_pDBService.userSoil.getSoilLevelText(soilLevel),

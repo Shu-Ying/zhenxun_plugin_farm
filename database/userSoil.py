@@ -1,3 +1,5 @@
+import math
+
 from zhenxun.services.log import logger
 
 from ..config import g_bIsDebug
@@ -88,7 +90,7 @@ class CUserSoilDB(CSqlManager):
         if not plantInfo:
             return
 
-        currentTime = g_pToolManager.dateTime().now().timestamp()
+        currentTime = int(g_pToolManager.dateTime().now().timestamp())
         # 如果当前时间已经超过或等于成熟时间，则作物已成熟或可收获
         if currentTime >= soilInfo["matureTime"]:
             return
@@ -234,7 +236,7 @@ class CUserSoilDB(CSqlManager):
         )
 
     @classmethod
-    async def getUserSoil(cls, uid: str, soilIndex: int) -> dict | None:
+    async def getUserSoil(cls, uid: str, soilIndex: int) -> dict:
         """获取指定用户某块土地的详细信息
 
         Args:
@@ -251,7 +253,7 @@ class CUserSoilDB(CSqlManager):
             )
             row = await cursor.fetchone()
             if not row:
-                return None
+                return {}
             columns = [description[0] for description in cursor.description]
             return dict(zip(columns, row))
 
@@ -442,7 +444,7 @@ class CUserSoilDB(CSqlManager):
         """
         # 校验土地区是否已种植
         soilInfo = await cls.getUserSoil(uid, soilIndex)
-        if not soilInfo:
+        if soilInfo and soilInfo.get("plantName"):
             return False
 
         # 获取植物配置
@@ -457,7 +459,7 @@ class CUserSoilDB(CSqlManager):
         percent = await cls.getSoilLevelTime(soilInfo.get("soilLevel", 0))
 
         # 处理土地等级带来的时间缩短
-        time = time * (100 + percent) // 100
+        time = math.floor(time * (100 + percent) // 100)
 
         matureTs = nowTs + time * 3600
 
@@ -473,11 +475,11 @@ class CUserSoilDB(CSqlManager):
                         "plantTime": nowTs,
                         "matureTime": matureTs,
                         "soilLevel": prev.get("soilLevel", 0),
-                        "wiltStatus": prev.get("wiltStatus", 0),
-                        "fertilizerStatus": prev.get("fertilizerStatus", 0),
-                        "bugStatus": prev.get("bugStatus", 0),
-                        "weedStatus": prev.get("weedStatus", 0),
-                        "waterStatus": prev.get("waterStatus", 0),
+                        "wiltStatus": 0,
+                        "fertilizerStatus": 0,
+                        "bugStatus": 0,
+                        "weedStatus": 0,
+                        "waterStatus": 0,
                         "harvestCount": 0,
                     }
                 )

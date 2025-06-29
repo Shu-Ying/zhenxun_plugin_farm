@@ -557,7 +557,7 @@ soil_upgrade = on_alconna(
 
 
 @soil_upgrade.handle()
-async def _(session: Uninfo, index: Query[int] = AlconnaQuery("num", 1)):
+async def _(session: Uninfo, index: Query[int] = AlconnaQuery("index", 1)):
     uid = str(session.user.id)
 
     if not await g_pToolManager.isRegisteredByUid(uid):
