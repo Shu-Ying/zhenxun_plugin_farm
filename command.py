@@ -34,6 +34,7 @@ diuse_register = on_alconna(
     priority=5,
     rule=to_me(),
     block=True,
+    use_cmd_start=True,
 )
 
 
@@ -331,6 +332,7 @@ reclamation = on_alconna(
     Alconna("开垦"),
     priority=5,
     block=True,
+    use_cmd_start=True,
 )
 
 
@@ -553,6 +555,7 @@ soil_upgrade = on_alconna(
     Alconna("土地升级", Args["index", int]),
     priority=5,
     block=True,
+    use_cmd_start=True,
 )
 
 
