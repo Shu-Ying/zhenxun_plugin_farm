@@ -10,7 +10,6 @@ from rich.progress import (
     TimeRemainingColumn,
     TransferSpeedColumn,
 )
-
 from zhenxun.configs.config import Config
 from zhenxun.services.log import logger
 

@@ -552,12 +552,12 @@ class CFarmManager:
             harvestCount = 0  # 成功收获数量
 
             for i in range(1, soilNumber + 1):
-                # 如果没有种植
-                if not await g_pDBService.userSoil.isSoilPlanted(uid, i):
-                    continue
-
                 soilInfo = await g_pDBService.userSoil.getUserSoil(uid, i)
                 if not soilInfo:
+                    continue
+
+                # 如果没有种植
+                if soilInfo.get("isSoilPlanted", 0):
                     continue
 
                 level = soilInfo.get("soilLevel", 0)
@@ -676,12 +676,12 @@ class CFarmManager:
 
         experience = 0
         for i in range(1, soilNumber + 1):
-            # 如果没有种植
-            if not await g_pDBService.userSoil.isSoilPlanted(uid, i):
-                continue
-
             soilInfo = await g_pDBService.userSoil.getUserSoil(uid, i)
             if not soilInfo:
+                continue
+
+            # 如果没有种植
+            if soilInfo.get("isSoilPlanted", 0):
                 continue
 
             # 如果不是枯萎状态
@@ -704,6 +704,7 @@ class CFarmManager:
                     "plantTime": 0,
                     "matureTime": 0,
                     "wiltStatus": 0,
+                    "isSoilPlanted": 0,
                 },
             )
 
@@ -810,12 +811,12 @@ class CFarmManager:
         isStealingPlant = 0
 
         for i in range(1, soilNumber + 1):
-            # 如果没有种植
-            if not await g_pDBService.userSoil.isSoilPlanted(target, i):
-                continue
-
             soilInfo = await g_pDBService.userSoil.getUserSoil(target, i)
             if not soilInfo:
+                continue
+
+            # 如果没有种植
+            if soilInfo.get("isSoilPlanted", 0):
                 continue
 
             # 如果是枯萎状态

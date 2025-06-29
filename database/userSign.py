@@ -273,7 +273,7 @@ class CUserSignDB(CSqlManager):
             sql = "SELECT signDate FROM userSignLog WHERE uid=? AND signDate LIKE ?"
             async with cls.m_pDB.execute(sql, (uid, f"{monthStr}-%")) as cursor:
                 rows = await cursor.fetchall()
-                signedDays = set(int(r[0][-2:]) for r in rows if r[0][-2:].isdigit())
+                signedDays = {int(r[0][-2:]) for r in rows if r[0][-2:].isdigit()}
         except Exception as e:
             logger.warning("绘制签到图时数据库查询失败", e=e)
             signedDays = set()

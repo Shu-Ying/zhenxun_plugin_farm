@@ -24,6 +24,7 @@ class CUserSoilDB(CSqlManager):
             "weedStatus": "INTEGER DEFAULT 0",  # 杂草状态 0=无杂草，1=有杂草
             "waterStatus": "INTEGER DEFAULT 0",  # 缺水状态 0=不缺水，1=缺水
             "harvestCount": "INTEGER DEFAULT 0",  # 收获次数
+            "isSoilPlanted": "INTEGER DEFAULT 0",  # 是否种植作物
             "PRIMARY KEY": "(uid, soilIndex)",
         }
 
@@ -182,8 +183,8 @@ class CUserSoilDB(CSqlManager):
                 INSERT INTO userSoil
                   (uid, soilIndex, plantName, plantTime, matureTime,
                    soilLevel, wiltStatus, fertilizerStatus, bugStatus,
-                   weedStatus, waterStatus, harvestCount)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
+                   weedStatus, waterStatus, harvestCount, isSoilPlanted)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
                 """,
                 (
                     soilInfo["uid"],
@@ -198,6 +199,7 @@ class CUserSoilDB(CSqlManager):
                     soilInfo.get("weedStatus", 0),
                     soilInfo.get("waterStatus", 0),
                     soilInfo.get("harvestCount", 0),
+                    soilInfo.get("isSoilPlanted", 0),
                 ),
             )
 
@@ -216,8 +218,8 @@ class CUserSoilDB(CSqlManager):
                 INSERT INTO userSoil
                   (uid, soilIndex, plantName, plantTime, matureTime,
                    soilLevel, wiltStatus, fertilizerStatus, bugStatus,
-                   weedStatus, waterStatus, harvestCount)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
+                   weedStatus, waterStatus, harvestCount, isSoilPlanted)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
                 """,
             (
                 soilInfo["uid"],
@@ -232,6 +234,7 @@ class CUserSoilDB(CSqlManager):
                 soilInfo.get("weedStatus", 0),
                 soilInfo.get("waterStatus", 0),
                 soilInfo.get("harvestCount", 0),
+                soilInfo.get("isSoilPlanted", 0),
             ),
         )
 
@@ -360,6 +363,7 @@ class CUserSoilDB(CSqlManager):
             "weedStatus",
             "waterStatus",
             "harvestCount",
+            "isSoilPlanted",
         }
         setClauses = []
         values = []
@@ -414,23 +418,6 @@ class CUserSoilDB(CSqlManager):
         )
 
     @classmethod
-    async def isSoilPlanted(cls, uid: str, soilIndex: int) -> bool:
-        """判断指定用户的指定土地是否已种植
-
-        Args:
-            uid (str): 用户ID
-            soilIndex (int): 土地索引
-
-        Returns:
-            bool: 如果 plantName 不为空且 plantTime 大于 0，则视为已种植，返回 True；否则 False
-        """
-        soilInfo = await cls.getUserSoil(uid, soilIndex)
-        if not soilInfo:
-            return False
-
-        return bool(soilInfo.get("plantName")) and soilInfo.get("plantTime", 0) > 0
-
-    @classmethod
     async def sowingByPlantName(cls, uid: str, soilIndex: int, plantName: str) -> bool:
         """播种指定作物到用户土地区
 
@@ -481,6 +468,7 @@ class CUserSoilDB(CSqlManager):
                         "weedStatus": 0,
                         "waterStatus": 0,
                         "harvestCount": 0,
+                        "isSoilPlanted": 1,
                     }
                 )
             return True
