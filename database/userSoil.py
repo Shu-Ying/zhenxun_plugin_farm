@@ -24,7 +24,7 @@ class CUserSoilDB(CSqlManager):
             "weedStatus": "INTEGER DEFAULT 0",  # 杂草状态 0=无杂草，1=有杂草
             "waterStatus": "INTEGER DEFAULT 0",  # 缺水状态 0=不缺水，1=缺水
             "harvestCount": "INTEGER DEFAULT 0",  # 收获次数
-            "isSoilPlanted": "INTEGER DEFAULT 0",  # 是否种植作物
+            "isSoilPlanted": "INTEGER DEFAULT NULL",  # 是否种植作物
             "PRIMARY KEY": "(uid, soilIndex)",
         }
 
