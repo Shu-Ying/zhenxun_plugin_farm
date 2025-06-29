@@ -243,10 +243,16 @@ class CFarmManager:
             soilInfo = await g_pDBService.userSoil.getUserSoil(uid, i)
 
             if soilInfo:
-                if soilInfo["soilLevel"] == 1:
-                    iconPath = g_sResourcePath / "soil/红土地.png"
-                else:
-                    iconPath = g_sResourcePath / "soil/普通土地.png"
+                match soilInfo.get("soilLevel", 0):
+                    case 1:
+                        name = "红土地.png"
+                    case 2:
+                        name = "黑土地.png"
+                    case 3:
+                        name = "金土地.png"
+                    case _:
+                        name = "普通土地.png"
+                iconPath = g_sResourcePath / "soil" / name
 
                 if iconPath.exists():
                     icon = (iconPath, 33, 33)

@@ -244,7 +244,7 @@ class CUserSoilDB(CSqlManager):
             soilIndex (int): 土地索引
 
         Returns:
-            Optional[dict]: 记录存在返回字段-值字典，否则返回 None
+            dict: 记录存在返回字段-值字典，否则返回 None
         """
         async with cls._transaction():
             cursor = await cls.m_pDB.execute(
@@ -266,7 +266,7 @@ class CUserSoilDB(CSqlManager):
             soilIndex (int): 土地索引
 
         Returns:
-            Optional[dict]: 记录存在返回字段-值字典，否则返回 None
+            dict | None: 记录存在返回字段-值字典，否则返回 None
         """
         cursor = await cls.m_pDB.execute(
             "SELECT * FROM userSoil WHERE uid = ? AND soilIndex = ?",

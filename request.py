@@ -31,7 +31,7 @@ class CRequestManager:
         params: dict | None = None,
         jsonData: dict | None = None,
     ) -> bool:
-        """下载文件到指定路径并覆盖已存在的文件，并显示下载进度条
+        """下载文件到指定路径并覆盖已存在的文件
 
         Args:
             url (str): 文件的下载链接
@@ -210,7 +210,6 @@ class CRequestManager:
             # 重命名为 sign_in.json
             g_pToolManager.renameFile(f"{path}/signTemp.json", "sign_in.json")
             return True
-
         except Exception as e:
             logger.error("下载签到文件失败", e=e)
             return False

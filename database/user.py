@@ -35,7 +35,7 @@ class CUserDB(CSqlManager):
             point (int): 农场币
 
         Returns:
-            Union[bool, str]: False 表示失败，字符串表示成功信息
+            bool | str: False 表示失败，字符串表示成功信息
         """
         nowStr = g_pToolManager.dateTime().date().today().strftime("%Y-%m-%d")
         sql = (
@@ -55,7 +55,7 @@ class CUserDB(CSqlManager):
         """获取所有用户UID列表
 
         Returns:
-            List[str]: 用户UID列表
+            list[str]: 用户UID列表
         """
         cursor = await cls.m_pDB.execute("SELECT uid FROM user")
         rows = await cursor.fetchall()
