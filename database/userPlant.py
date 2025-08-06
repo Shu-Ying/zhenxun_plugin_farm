@@ -10,6 +10,7 @@ class CUserPlantDB(CSqlManager):
             "uid": "TEXT NOT NULL",  # 用户Uid
             "plant": "TEXT NOT NULL",  # 作物名称
             "count": "INTEGER NOT NULL DEFAULT 0",  # 数量
+            "isLock": "INTEGER NOT NULL DEFAULT 0",  # 是否上锁 0=没有，非0=有
             "PRIMARY KEY": "(uid, plant)",
         }
 
@@ -92,6 +93,27 @@ class CUserPlantDB(CSqlManager):
             return None
 
     @classmethod
+    async def checkUserPlantByName(cls, uid: str, plant: str) -> bool:
+        """根据作物名称判断用户作物仓库是否存在该作物
+
+        Args:
+            uid (str): 用户uid
+            plant (str): 作物名称
+
+        Returns:
+            bool: 是否存在
+        """
+        try:
+            async with cls.m_pDB.execute(
+                "SELECT * FROM userPlant WHERE uid = ? AND plant = ?", (uid, plant)
+            ) as cursor:
+                row = await cursor.fetchone()
+                return True if row else False
+        except Exception as e:
+            logger.warning("checkUserPlantByName 查询失败！", e=e)
+            return False
+
+    @classmethod
     async def updateUserPlantByName(cls, uid: str, plant: str, count: int) -> bool:
         """更新 userPlant 表中某个作物的数量
 
@@ -114,7 +136,51 @@ class CUserPlantDB(CSqlManager):
                 )
             return True
         except Exception as e:
-            logger.warning("updateUserPlantByName失败！", e=e)
+            logger.warning("updateUserPlantByName 失败！", e=e)
+            return False
+
+    @classmethod
+    async def lockUserPlantByName(cls, uid: str, plant: str, lock: int) -> bool:
+        """给作物加锁，防止一键售卖
+
+        Args:
+            uid (str): 用户uid
+            plant (str): 作物名称
+            lock (int): 0为解锁，非0均为加锁
+
+        Returns:
+            bool: 是否加锁成功
+        """
+        try:
+            async with cls._transaction():
+                await cls.m_pDB.execute(
+                    "UPDATE userPlant SET isLock = ? WHERE uid = ? AND plant = ?",
+                    (lock, uid, plant),
+                )
+            return True
+        except Exception as e:
+            logger.warning("lockUserPlantByName 失败！", e=e)
+            return False
+
+    @classmethod
+    async def checkPlantLockByName(cls, uid: str, plant: str) -> bool:
+        """根据作物名称判断是否加锁
+
+        Args:
+            uid (str): 用户uid
+            plant (str): 作物名称
+
+        Returns:
+            bool: 是否加锁
+        """
+        try:
+            async with cls.m_pDB.execute(
+                "SELECT isLock FROM userPlant WHERE uid = ? AND plant = ?", (uid, plant)
+            ) as cursor:
+                row = await cursor.fetchone()
+                return row[0] > 0 if row else False
+        except Exception as e:
+            logger.warning("checkUserPlantByName 查询失败！", e=e)
             return False
 
     @classmethod

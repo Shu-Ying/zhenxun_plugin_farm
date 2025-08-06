@@ -159,6 +159,7 @@ class CFarmManager:
         if image:
             avatar = BuildImage(background=image)
 
+            await avatar.resize(0, 140, 150)
             await img.paste(avatar, (125, 85))
 
         # 头像框
@@ -732,7 +733,15 @@ class CFarmManager:
             bytes: 返回图片
         """
         data_list = []
-        column_name = ["-", "作物名称", "数量", "单价", "总价", "是否可以上架交易行"]
+        column_name = [
+            "-",
+            "作物名称",
+            "数量",
+            "单价",
+            "总价",
+            "是否上锁",
+            "是否可以上架交易行",
+        ]
 
         plant = await g_pDBService.userPlant.getUserPlantByUid(uid)
 
@@ -763,7 +772,15 @@ class CFarmManager:
 
             number = int(count) * plantInfo["price"]
 
-            data_list.append([icon, name, count, plantInfo["price"], number, sell])
+            isLock = await g_pDBService.userPlant.checkPlantLockByName(uid, name)
+            if isLock:
+                lock = "上锁"
+            else:
+                lock = "未上锁"
+
+            data_list.append(
+                [icon, name, count, plantInfo["price"], number, lock, sell]
+            )
 
         result = await ImageTemplate.table_page(
             "作物仓库",
@@ -773,6 +790,31 @@ class CFarmManager:
         )
 
         return result.pic2bytes()
+
+    @classmethod
+    async def lockUserPlantByUid(cls, uid: str, name: str, lock: int) -> str:
+        """加/解 锁用户作物
+
+        Args:
+            uid (str): 用户uid
+            name (str): 作物名称
+            lock (int): 0=解锁 非0=加锁
+
+        Returns:
+            str: 返回
+        """
+        # 先判断该用户仓库是否有该作物
+        if not await g_pDBService.userPlant.checkUserPlantByName(uid, name):
+            return g_sTranslation["lockPlant"]["noPlant"]
+
+        # 更改加锁状态
+        if await g_pDBService.userPlant.lockUserPlantByName(uid, name, lock):
+            if lock == 0:
+                return g_sTranslation["lockPlant"]["unlockPlant"].format(name=name)
+            else:
+                return g_sTranslation["lockPlant"]["lockPlant"].format(name=name)
+        else:
+            return g_sTranslation["lockPlant"]["error"]
 
     @classmethod
     async def stealing(cls, uid: str, target: str) -> str:

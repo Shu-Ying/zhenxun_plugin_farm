@@ -121,4 +121,10 @@ g_sTranslation = {
         "aquamarine": "增产+32% 经验+32% 时间-28% 幸运+1%",
         "blackcrystal": "增产+32% 经验+40% 时间-28% 幸运+2%",
     },
+    "lockPlant": {
+        "noPlant": "很抱歉，你的作物仓库中没有该作物",
+        "lockPlant": "加锁成功，现在{name}不会被一键售卖了",
+        "unlockPlant": "解锁成功，现在{name}会被一键售卖了",
+        "error": "未知错误",
+    },
 }

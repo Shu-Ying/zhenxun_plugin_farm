@@ -167,6 +167,13 @@ class CShopManager:
 
         if name == "":
             for plantName, count in plant.items():
+                isLock = await g_pDBService.userPlant.checkPlantLockByName(
+                    uid, plantName
+                )
+
+                if isLock:
+                    continue
+
                 plantInfo = await g_pDBService.plant.getPlantByName(plantName)
                 if not plantInfo:
                     continue
