@@ -92,6 +92,9 @@ diuse_farm = on_alconna(
         Subcommand("change-name", Args["name?", str], help_text="更改农场名"),
         Subcommand("sign-in", help_text="农场签到"),
         Subcommand("admin-up", Args["num?", int], help_text="农场下阶段"),
+        Subcommand("point-to-vipPoint", Args["num?", int], help_text="农场币换点券"),
+        Subcommand("my-vipPoint", help_text="我的点券"),
+        Subcommand("mx-change", Args["num?", int], help_text="mx管理员变更农场币"),
     ),
     priority=5,
     block=True,
@@ -606,3 +609,73 @@ async def _(session: Uninfo, num: Query[int] = AlconnaQuery("num", 0)):
         return
 
     await g_pDBService.userSoil.nextPhase(uid, num.result)
+
+
+diuse_farm.shortcut(
+    "农场币换点券(.*?)",
+    command="我的农场",
+    arguments=["point-to-vipPoint"],
+    prefix=True,
+)
+
+
+@diuse_farm.assign("point-to-vipPoint")
+async def _(session: Uninfo, num: Query[int] = AlconnaQuery("num", 0)):
+    if num.result <= 0:
+        await MessageUtils.build_message("请在指令后跟需要购买点券的数量").finish(
+            reply_to=True
+        )
+
+    uid = str(session.user.id)
+
+    if not await g_pToolManager.isRegisteredByUid(uid):
+        return
+
+    result = await g_pFarmManager.pointToVipPointByUid(uid, num.result)
+    await MessageUtils.build_message(result).send(reply_to=True)
+
+
+diuse_farm.shortcut(
+    "我的点券",
+    command="我的农场",
+    arguments=["my-vipPoint"],
+    prefix=True,
+)
+
+
+@diuse_farm.assign("my-vipPoint")
+async def _(session: Uninfo):
+    uid = str(session.user.id)
+    vipPoint = await g_pDBService.user.getUserVipPointByUid(uid)
+
+    if not await g_pToolManager.isRegisteredByUid(uid):
+        return
+
+    await MessageUtils.build_message(
+        g_sTranslation["basic"]["vipPoint"].format(vipPoint=vipPoint)
+    ).send(reply_to=True)
+
+
+diuse_farm.shortcut(
+    "mx管理员变更农场币(.*?)",
+    command="我的农场",
+    arguments=["mx-change"],
+    prefix=True,
+)
+
+
+@diuse_farm.assign("mx-change")
+async def _(session: Uninfo, num: Query[int] = AlconnaQuery("num", 0)):
+    if num.result <= 0:
+        await MessageUtils.build_message("请在指令后跟需要农场币的数量").finish(
+            reply_to=True
+        )
+
+    uid = str(session.user.id)
+
+    if not await g_pToolManager.isRegisteredByUid(uid):
+        return
+
+    await g_pDBService.user.updateUserPointByUid(uid, int(num.result))
+    message = f"伟大的米线大人把你的农场币变更为: {num.result} 农场币"
+    await MessageUtils.build_message(message).send(reply_to=True)
