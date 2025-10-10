@@ -1150,11 +1150,15 @@ class CFarmManager:
 
     @classmethod
     async def pointToVipPointByUid(cls, uid: str, num: int) -> str:
+        """农场币兑换点券
+        num:用户传参,即将兑换的点券
+        pro:兑换倍数;兑换倍数乘以num即为需要消耗的农场币
+        """
         if num <= 0:
             return "点券兑换数量必须大于0"
 
-        pro = float(Config.get_config("zhenxun_plugin_farm", "点券兑换倍数"))
-        pro *= float(num)
+        pro = int(Config.get_config("zhenxun_plugin_farm", "点券兑换倍数"))
+        pro *= num
 
         point = await g_pDBService.user.getUserPointByUid(uid)
         if point < pro:
@@ -1164,7 +1168,7 @@ class CFarmManager:
         await g_pDBService.user.updateUserPointByUid(uid, int(point))
 
         p = await g_pDBService.user.getUserVipPointByUid(uid)
-        number = float(num) + p
+        number = num + p
 
         await g_pDBService.user.updateUserVipPointByUid(uid, int(number))
 
