@@ -34,6 +34,7 @@ g_sTranslation = {
     "basic": {
         "notFarm": "尚未开通农场，快at我发送 开通农场 开通吧 🌱🚜",
         "point": "你的当前农场币为: {point} 🌾💰",
+        "vipPoint": "你的当前点券为: {vipPoint} 🌾💰",
     },
     "register": {
         "success": "✅ 农场开通成功！\n💼 初始资金：{point}农场币 🥳🎉",

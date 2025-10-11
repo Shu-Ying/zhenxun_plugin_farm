@@ -1148,5 +1148,31 @@ class CFarmManager:
             text=g_sTranslation["soilInfo"][soilLevelText],
         )
 
+    @classmethod
+    async def pointToVipPointByUid(cls, uid: str, num: int) -> str:
+        """农场币兑换点券
+        num:用户传参,即将兑换的点券
+        pro:兑换倍数;兑换倍数乘以num即为需要消耗的农场币
+        """
+        if num <= 0:
+            return "点券兑换数量必须大于0"
+
+        pro = int(Config.get_config("zhenxun_plugin_farm", "点券兑换倍数"))
+        pro *= num
+
+        point = await g_pDBService.user.getUserPointByUid(uid)
+        if point < pro:
+            return f"你的农场币不足，当前农场币为{point}，兑换还需要{pro - point}农场币"
+
+        point -= pro
+        await g_pDBService.user.updateUserPointByUid(uid, int(point))
+
+        p = await g_pDBService.user.getUserVipPointByUid(uid)
+        number = num + p
+
+        await g_pDBService.user.updateUserVipPointByUid(uid, int(number))
+
+        return f"兑换{num}点券成功，当前点券：{number}，当前农场币：{point}"
+
 
 g_pFarmManager = CFarmManager()
