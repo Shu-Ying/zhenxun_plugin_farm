@@ -94,7 +94,7 @@ diuse_farm = on_alconna(
         Subcommand("change-name", Args["name?", str], help_text="更改农场名"),
         Subcommand("sign-in", help_text="农场签到"),
         Subcommand("admin-up", Args["num?", int], help_text="农场下阶段"),
-        Subcommand("point-to-vipPoint", Args["num?", int], help_text="农场币换点券"),
+        Subcommand("point-to-vipPoint", Args["num?", int], help_text="点券兑换"),
         Subcommand("my-vipPoint", help_text="我的点券"),
     ),
     priority=5,
@@ -651,7 +651,7 @@ async def _(session: Uninfo, num: Query[int] = AlconnaQuery("num", 0)):
 
 
 diuse_farm.shortcut(
-    "农场币换点券(.*?)",
+    "点券兑换(.*?)",
     command="我的农场",
     arguments=["point-to-vipPoint"],
     prefix=True,
