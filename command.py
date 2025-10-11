@@ -95,7 +95,7 @@ diuse_farm = on_alconna(
         Subcommand("sign-in", help_text="农场签到"),
         Subcommand("admin-up", Args["num?", int], help_text="农场下阶段"),
         Subcommand("point-to-vipPoint", Args["num?", int], help_text="农场币换点券"),
-        Subcommand("my-vipPoint", help_text="我的点券")
+        Subcommand("my-vipPoint", help_text="我的点券"),
     ),
     priority=5,
     block=True,
@@ -693,5 +693,3 @@ async def _(session: Uninfo):
     await MessageUtils.build_message(
         g_sTranslation["basic"]["vipPoint"].format(vipPoint=vipPoint)
     ).send(reply_to=True)
-
-
