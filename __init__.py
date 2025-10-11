@@ -11,6 +11,7 @@ from .database.database import g_pSqlManager
 from .dbService import g_pDBService
 from .event.event import g_pEventManager
 from .farm.farm import g_pFarmManager
+from .farm.help import g_pHelpManager
 from .farm.shop import g_pShopManager
 from .json import g_pJsonManager
 from .request import g_pRequestManager
@@ -89,6 +90,8 @@ async def start():
 
     # 检查作物文件是否缺失 or 更新
     await g_pRequestManager.initPlantDBFile()
+
+    await g_pHelpManager.createHelpImage()
 
 
 # 析构函数
