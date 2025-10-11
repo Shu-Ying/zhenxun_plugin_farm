@@ -95,8 +95,7 @@ diuse_farm = on_alconna(
         Subcommand("sign-in", help_text="农场签到"),
         Subcommand("admin-up", Args["num?", int], help_text="农场下阶段"),
         Subcommand("point-to-vipPoint", Args["num?", int], help_text="农场币换点券"),
-        Subcommand("my-vipPoint", help_text="我的点券"),
-        Subcommand("mx-change", Args["num?", int], help_text="mx管理员变更农场币"),
+        Subcommand("my-vipPoint", help_text="我的点券")
     ),
     priority=5,
     block=True,
@@ -696,26 +695,3 @@ async def _(session: Uninfo):
     ).send(reply_to=True)
 
 
-diuse_farm.shortcut(
-    "mx管理员变更农场币(.*?)",
-    command="我的农场",
-    arguments=["mx-change"],
-    prefix=True,
-)
-
-
-@diuse_farm.assign("mx-change")
-async def _(session: Uninfo, num: Query[int] = AlconnaQuery("num", 0)):
-    if num.result <= 0:
-        await MessageUtils.build_message("请在指令后跟需要农场币的数量").finish(
-            reply_to=True
-        )
-
-    uid = str(session.user.id)
-
-    if not await g_pToolManager.isRegisteredByUid(uid):
-        return
-
-    await g_pDBService.user.updateUserPointByUid(uid, int(num.result))
-    message = f"伟大的米线大人把你的农场币变更为: {num.result} 农场币"
-    await MessageUtils.build_message(message).send(reply_to=True)
