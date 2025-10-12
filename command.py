@@ -654,7 +654,7 @@ async def _(session: Uninfo, num: Query[int] = AlconnaQuery("num", 0)):
 
 
 diuse_farm.shortcut(
-    "农场币换点券(.*?)",
+    "点券兑换(.*?)",
     command="我的农场",
     arguments=["point-to-vipPoint"],
     prefix=True,

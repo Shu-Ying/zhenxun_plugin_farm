@@ -1150,12 +1150,25 @@ class CFarmManager:
 
     @classmethod
     async def pointToVipPointByUid(cls, uid: str, num: int) -> str:
-        """农场币兑换点券
+        """点券兑换
         num:用户传参,即将兑换的点券
         pro:兑换倍数;兑换倍数乘以num即为需要消耗的农场币
+        Args:
+            uid (str): 用户Uid
+            num (int): 兑换点券数量
+        Returns:
+            str: 返回结果
+        兑换比例在配置文件中配置
+        目前配置文件中默认是20倍
+        100点券需要20000农场币
+        赠送点券规则：
+        小于2000点券：0
+        2000-5000点券：100
+        5000-50000点券：280
+        大于50000点券：3000
         """
-        if num <= 0:
-            return "点券兑换数量必须大于0"
+        if num < 100:
+            return "点券兑换数量必须大于等于100"
 
         pro = int(Config.get_config("zhenxun_plugin_farm", "点券兑换倍数"))
         pro *= num
@@ -1164,15 +1177,25 @@ class CFarmManager:
         if point < pro:
             return f"你的农场币不足，当前农场币为{point}，兑换还需要{pro - point}农场币"
 
+        p = await g_pDBService.user.getUserVipPointByUid(uid)
+
+        giftPoints: int
+        if num < 2000:
+            giftPoints = 0
+        elif num < 5000:
+            giftPoints = 100
+        elif num < 50000:
+            giftPoints = 280
+        else:
+            giftPoints = 3000
+
+        number = num + p + giftPoints
+        await g_pDBService.user.updateUserVipPointByUid(uid, int(number))
+
         point -= pro
         await g_pDBService.user.updateUserPointByUid(uid, int(point))
 
-        p = await g_pDBService.user.getUserVipPointByUid(uid)
-        number = num + p
-
-        await g_pDBService.user.updateUserVipPointByUid(uid, int(number))
-
-        return f"兑换{num}点券成功，当前点券：{number}，当前农场币：{point}"
+        return f"兑换{num}点券成功，当前点券：{number}，赠送点券：{giftPoints}，当前农场币：{point}"
 
 
 g_pFarmManager = CFarmManager()
