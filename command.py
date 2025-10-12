@@ -19,7 +19,9 @@ from nonebot_plugin_uninfo import Uninfo
 from nonebot_plugin_waiter import waiter
 
 from zhenxun.configs.config import BotConfig
+from zhenxun.configs.path_config import DATA_PATH
 from zhenxun.services.log import logger
+from zhenxun.utils._build_image import BuildImage
 from zhenxun.utils.message import MessageUtils
 
 from .config import g_bSignStatus, g_sTranslation
@@ -95,7 +97,8 @@ diuse_farm = on_alconna(
         Subcommand("sign-in", help_text="农场签到"),
         Subcommand("admin-up", Args["num?", int], help_text="农场下阶段"),
         Subcommand("point-to-vipPoint", Args["num?", int], help_text="农场币换点券"),
-        Subcommand("my-vipPoint", help_text="我的点券")
+        Subcommand("my-vipPoint", help_text="我的点券"),
+        Subcommand("farm-help", help_text="农场帮助"),
     ),
     priority=5,
     block=True,
@@ -695,3 +698,18 @@ async def _(session: Uninfo):
     ).send(reply_to=True)
 
 
+diuse_farm.shortcut(
+    "农场帮助",
+    command="我的农场",
+    arguments=["farm-help"],
+    prefix=True,
+)
+
+
+@diuse_farm.assign("farm-help")
+async def _(session: Uninfo):
+    savePath = DATA_PATH / "farm_res/html/help.png"
+
+    image = BuildImage(background=savePath)
+
+    await MessageUtils.build_message(image).send(reply_to=True)
