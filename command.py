@@ -85,6 +85,8 @@ diuse_farm = on_alconna(
         Subcommand("harvest", help_text="收获"),
         Subcommand("eradicate", help_text="铲除"),
         Subcommand("my-plant", help_text="我的作物"),
+        Subcommand("lock-plant", Args["name?", str], help_text="作物加锁"),
+        Subcommand("unlock-plant", Args["name?", str], help_text="作物解锁"),
         Subcommand("sell-plant", Args["name?", str]["num?", int], help_text="出售作物"),
         Subcommand("stealing", Args["target?", At], help_text="偷菜"),
         Subcommand("buy-point", Args["num?", int], help_text="购买农场币"),
@@ -92,6 +94,8 @@ diuse_farm = on_alconna(
         Subcommand("change-name", Args["name?", str], help_text="更改农场名"),
         Subcommand("sign-in", help_text="农场签到"),
         Subcommand("admin-up", Args["num?", int], help_text="农场下阶段"),
+        Subcommand("point-to-vipPoint", Args["num?", int], help_text="点券兑换"),
+        Subcommand("my-vipPoint", help_text="我的点券"),
     ),
     priority=5,
     block=True,
@@ -328,6 +332,65 @@ async def _(session: Uninfo):
     await MessageUtils.build_message(result).send(reply_to=True)
 
 
+diuse_farm.shortcut(
+    "作物加锁(?P<name>)",
+    command="我的农场",
+    arguments=["lock-plant", "{name}"],
+    prefix=True,
+)
+
+
+@diuse_farm.assign("lock-plant")
+async def _(session: Uninfo, name: Match[str]):
+    uid = str(session.user.id)
+
+    if not await g_pToolManager.isRegisteredByUid(uid):
+        return
+
+    result = await g_pFarmManager.lockUserPlantByUid(uid, name.result, 1)
+    await MessageUtils.build_message(result).send(reply_to=True)
+
+
+diuse_farm.shortcut(
+    "作物解锁(?P<name>)",
+    command="我的农场",
+    arguments=["unlock-plant", "{name}"],
+    prefix=True,
+)
+
+
+@diuse_farm.assign("unlock-plant")
+async def _(session: Uninfo, name: Match[str]):
+    uid = str(session.user.id)
+
+    if not await g_pToolManager.isRegisteredByUid(uid):
+        return
+
+    result = await g_pFarmManager.lockUserPlantByUid(uid, name.result, 0)
+    await MessageUtils.build_message(result).send(reply_to=True)
+
+
+diuse_farm.shortcut(
+    "出售作物(?P<name>.*?)",
+    command="我的农场",
+    arguments=["sell-plant", "{name}"],
+    prefix=True,
+)
+
+
+@diuse_farm.assign("sell-plant")
+async def _(
+    session: Uninfo, name: Match[str], num: Query[int] = AlconnaQuery("num", -1)
+):
+    uid = str(session.user.id)
+
+    if not await g_pToolManager.isRegisteredByUid(uid):
+        return
+
+    result = await g_pShopManager.sellPlantByUid(uid, name.result, num.result)
+    await MessageUtils.build_message(result).send(reply_to=True)
+
+
 reclamation = on_alconna(
     Alconna("开垦"),
     priority=5,
@@ -362,27 +425,6 @@ async def _(session: Uninfo):
 
     res = await g_pFarmManager.reclamation(uid)
     await MessageUtils.build_message(res).send(reply_to=True)
-
-
-diuse_farm.shortcut(
-    "出售作物(?P<name>.*?)",
-    command="我的农场",
-    arguments=["sell-plant", "{name}"],
-    prefix=True,
-)
-
-
-@diuse_farm.assign("sell-plant")
-async def _(
-    session: Uninfo, name: Match[str], num: Query[int] = AlconnaQuery("num", -1)
-):
-    uid = str(session.user.id)
-
-    if not await g_pToolManager.isRegisteredByUid(uid):
-        return
-
-    result = await g_pShopManager.sellPlantByUid(uid, name.result, num.result)
-    await MessageUtils.build_message(result).send(reply_to=True)
 
 
 diuse_farm.shortcut(
@@ -606,3 +648,48 @@ async def _(session: Uninfo, num: Query[int] = AlconnaQuery("num", 0)):
         return
 
     await g_pDBService.userSoil.nextPhase(uid, num.result)
+
+
+diuse_farm.shortcut(
+    "点券兑换(.*?)",
+    command="我的农场",
+    arguments=["point-to-vipPoint"],
+    prefix=True,
+)
+
+
+@diuse_farm.assign("point-to-vipPoint")
+async def _(session: Uninfo, num: Query[int] = AlconnaQuery("num", 0)):
+    if num.result <= 0:
+        await MessageUtils.build_message("请在指令后跟需要购买点券的数量").finish(
+            reply_to=True
+        )
+
+    uid = str(session.user.id)
+
+    if not await g_pToolManager.isRegisteredByUid(uid):
+        return
+
+    result = await g_pFarmManager.pointToVipPointByUid(uid, num.result)
+    await MessageUtils.build_message(result).send(reply_to=True)
+
+
+diuse_farm.shortcut(
+    "我的点券",
+    command="我的农场",
+    arguments=["my-vipPoint"],
+    prefix=True,
+)
+
+
+@diuse_farm.assign("my-vipPoint")
+async def _(session: Uninfo):
+    uid = str(session.user.id)
+    vipPoint = await g_pDBService.user.getUserVipPointByUid(uid)
+
+    if not await g_pToolManager.isRegisteredByUid(uid):
+        return
+
+    await MessageUtils.build_message(
+        g_sTranslation["basic"]["vipPoint"].format(vipPoint=vipPoint)
+    ).send(reply_to=True)

@@ -34,6 +34,7 @@ g_sTranslation = {
     "basic": {
         "notFarm": "尚未开通农场，快at我发送 开通农场 开通吧 🌱🚜",
         "point": "你的当前农场币为: {point} 🌾💰",
+        "vipPoint": "你的当前点券为: {vipPoint} 🌾💰",
     },
     "register": {
         "success": "✅ 农场开通成功！\n💼 初始资金：{point}农场币 🥳🎉",
@@ -45,7 +46,9 @@ g_sTranslation = {
         "notNum": "❗️ 请输入购买数量！",
         "noLevel": "🔒 你的等级不够哦，努努力吧 💪",
         "noPoint": "💰 你的农场币不够哦~ 快速速氪金吧！💸",
+        "noVipPoint": "💰 你的点券不够哦~ 快速速氪金吧！💸",
         "success": "✅ 成功购买{name}，花费{total}农场币，剩余{point}农场币 🌾",
+        "vipSuccess": "✅ 成功购买{name}，花费{total}点券，剩余{point}点券 🌾",
         "errorSql": "❌ 购买失败，执行数据库错误！🛑",
         "error": "❌ 购买出错！请检查需购买的种子名称！🔍",
     },
@@ -120,5 +123,11 @@ g_sTranslation = {
         "amethyst": "增产+30% 经验+30% 时间-25% 幸运+1%",
         "aquamarine": "增产+32% 经验+32% 时间-28% 幸运+1%",
         "blackcrystal": "增产+32% 经验+40% 时间-28% 幸运+2%",
+    },
+    "lockPlant": {
+        "noPlant": "很抱歉，你的作物仓库中没有该作物",
+        "lockPlant": "加锁成功，现在{name}不会被一键售卖了",
+        "unlockPlant": "解锁成功，现在{name}会被一键售卖了",
+        "error": "未知错误",
     },
 }

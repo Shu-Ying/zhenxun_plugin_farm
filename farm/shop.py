@@ -1,6 +1,5 @@
 import math
 
-from zhenxun.services.log import logger
 from zhenxun.utils.image_utils import ImageTemplate
 
 from ..config import g_sResourcePath, g_sTranslation
@@ -33,7 +32,8 @@ class CShopManager:
         columnName = [
             "-",
             "种子名称",
-            "种子单价",
+            "农场币",
+            "点券",
             "解锁等级",
             "果实单价",
             "收获经验",
@@ -77,7 +77,8 @@ class CShopManager:
                 [
                     icon,
                     plant["name"],  # 种子名称
-                    plant["buy"],  # 种子单价
+                    plant["buy"],  # 农场币种子单价
+                    plant["vipBuy"],  # 点券种子单价
                     plant["level"],  # 解锁等级
                     plant["price"],  # 果实单价
                     plant["experience"],  # 收获经验
@@ -125,21 +126,32 @@ class CShopManager:
         if level[0] < int(plantInfo["level"]):
             return g_sTranslation["buySeed"]["noLevel"]
 
-        point = await g_pDBService.user.getUserPointByUid(uid)
-        total = int(plantInfo["buy"]) * num
-
+        """
         logger.debug(
             f"用户：{uid}购买{name}，数量为{num}。用户农场币为{point}，购买需要{total}"
         )
-
-        if point < total:
-            return g_sTranslation["buySeed"]["noPoint"]
+        """
+        if plantInfo["isVip"] == 1:
+            vipPoint = await g_pDBService.user.getUserVipPointByUid(uid)
+            total = int(plantInfo["vipBuy"]) * num
+            if vipPoint < total:
+                return g_sTranslation["buySeed"]["noVipPoint"]
+            await g_pDBService.user.updateUserVipPointByUid(uid, vipPoint - total)
         else:
+            point = await g_pDBService.user.getUserPointByUid(uid)
+            total = int(plantInfo["buy"]) * num
+            if point < total:
+                return g_sTranslation["buySeed"]["noPoint"]
             await g_pDBService.user.updateUserPointByUid(uid, point - total)
 
-            if not await g_pDBService.userSeed.addUserSeedByUid(uid, name, num):
-                return g_sTranslation["buySeed"]["errorSql"]
+        if not await g_pDBService.userSeed.addUserSeedByUid(uid, name, num):
+            return g_sTranslation["buySeed"]["errorSql"]
 
+        if plantInfo["isVip"] == 1:
+            return g_sTranslation["buySeed"]["vipSuccess"].format(
+                name=name, total=total, point=vipPoint - total
+            )
+        else:
             return g_sTranslation["buySeed"]["success"].format(
                 name=name, total=total, point=point - total
             )
@@ -167,6 +179,13 @@ class CShopManager:
 
         if name == "":
             for plantName, count in plant.items():
+                isLock = await g_pDBService.userPlant.checkPlantLockByName(
+                    uid, plantName
+                )
+
+                if isLock:
+                    continue
+
                 plantInfo = await g_pDBService.plant.getPlantByName(plantName)
                 if not plantInfo:
                     continue

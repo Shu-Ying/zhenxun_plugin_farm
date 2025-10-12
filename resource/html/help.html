@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <title>{{ title }}</title>
+    <style>
+        body {
+            background-color: #ffe4e9;
+            font-family: "Microsoft YaHei", sans-serif;
+            margin: 0;
+            padding: 0;
+        }
+        .container {
+            display: flex;
+            justify-content: center;
+            padding: 40px 20px;
+        }
+        .content-box {
+            background-color: #fff0f5;
+            border-radius: 24px;
+            padding: 30px;
+            box-shadow: 0 0 8px rgba(0, 0, 0, 0.1);
+            width: 900px;
+        }
+        .title {
+            text-align: center;
+            font-size: 32px;
+            font-weight: bold;
+            margin-bottom: 40px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th {
+            background-color: #ffb6c1;
+            font-weight: bold;
+            padding: 12px;
+            text-align: center;
+        }
+        td {
+            padding: 12px;
+            text-align: center;
+        }
+        tr:not(:last-child) {
+            border-bottom: 1px solid #ddd;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="content-box">
+            <div class="title">{{ title }}</div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>指令</th>
+                        <th>描述</th>
+                        <th>Tip</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for entry in data %}
+                    <tr>
+                        <td>{{ entry.command }}</td>
+                        <td>{{ entry.description }}</td>
+                        <td>{{ entry.tip }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</body>
+</html>

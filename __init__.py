@@ -59,6 +59,12 @@ __plugin_meta__ = PluginMetadata(
                 default_value="2",
             ),
             RegisterConfig(
+                key="点券兑换倍数",
+                value="2000",
+                help="农场币兑换点券的倍数 比例为2000:1",
+                default_value="2000",
+            ),
+            RegisterConfig(
                 key="手续费",
                 value="0.2",
                 help="金币兑换农场币的手续费 默认值为: 0.2 实际意义为20%手续费",

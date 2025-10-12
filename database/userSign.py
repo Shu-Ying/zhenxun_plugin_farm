@@ -165,7 +165,6 @@ class CUserSignDB(CSqlManager):
                         if row["currentMonth"] == currentMonth
                         else 1
                     )
-                    totalSignDays = row["totalSignDays"]
                     lastDate = row["lastSignDate"]
                     prevDate = (
                         g_pToolManager.dateTime().strptime(signDate, "%Y-%m-%d")
@@ -200,7 +199,7 @@ class CUserSignDB(CSqlManager):
                         ),
                     )
                 else:
-                    totalSignDays = 1
+                    monthSignDays = 1
                     await cls.m_pDB.execute(
                         """
                         INSERT INTO userSignSummary
@@ -211,7 +210,7 @@ class CUserSignDB(CSqlManager):
                             uid,
                             1,
                             currentMonth,
-                            1,
+                            monthSignDays,
                             signDate,
                             1,
                             1 if isSupplement else 0,
@@ -219,15 +218,13 @@ class CUserSignDB(CSqlManager):
                     )
 
             # 计算累签奖励
-            reward = g_pJsonManager.m_pSign["continuou"].get(f"{totalSignDays}", None)
-
+            reward = g_pJsonManager.m_pSign["continuou"].get(f"{monthSignDays}", None)
             if reward:
                 point += reward.get("point", 0)
                 exp += reward.get("exp", 0)
                 vipPoint = reward.get("vipPoint", 0)
 
                 plant = reward.get("plant", {})
-
                 if plant:
                     for key, value in plant.items():
                         await g_pDBService.userSeed.addUserSeedByUid(uid, key, value)
