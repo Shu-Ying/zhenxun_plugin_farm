@@ -33,7 +33,6 @@ class CShopManager:
             "-",
             "种子名称",
             "农场币",
-            "点券",
             "解锁等级",
             "果实单价",
             "收获经验",
@@ -47,6 +46,9 @@ class CShopManager:
         plants = await g_pDBService.plant.listPlants()
         filteredPlants = []
         for plant in plants:
+            # 只留下农场币购买的种子
+            if plant["isVip"] == 1:
+                continue
             # 跳过未解锁购买的种子
             if plant["isBuy"] == 0:
                 continue
@@ -78,7 +80,6 @@ class CShopManager:
                     icon,
                     plant["name"],  # 种子名称
                     plant["buy"],  # 农场币种子单价
-                    plant["vipBuy"],  # 点券种子单价
                     plant["level"],  # 解锁等级
                     plant["price"],  # 果实单价
                     plant["experience"],  # 收获经验
@@ -226,6 +227,101 @@ class CShopManager:
             return g_sTranslation["sellPlant"]["success1"].format(
                 name=name, point=totalPoint, num=currentPoint + totalPoint
             )
+
+    @classmethod
+    async def getVipSeedShopImage(cls, filterKey: str | int = 1, num: int = 1) -> bytes:
+        """获取点券商店页面
+
+        Args:
+            filterKey (str|int):
+                - 字符串: 根据关键字筛选种子名称
+                - 整数: 翻至对应页（无筛选）
+            num (int, optional): 当 filterKey 为字符串时，用于指定页码。Defaults to 1.
+
+        Returns:
+            bytes: 返回商店图片bytes
+        """
+        # 解析参数：区分筛选关键字和页码
+        filterStr = None
+        if isinstance(filterKey, int):
+            page = filterKey
+        else:
+            filterStr = filterKey
+            page = num
+
+        # 表头定义
+        columnName = [
+            "-",
+            "种子名称",
+            "点券",
+            "解锁等级",
+            "果实单价",
+            "收获经验",
+            "收获数量",
+            "成熟时间（小时）",
+            "收获次数",
+            "是否可以上架交易行",
+        ]
+
+        # 查询所有可购买作物，并根据筛选关键字过滤
+        plants = await g_pDBService.plant.listPlants()
+        filteredPlants = []
+        for plant in plants:
+            # 只留下点券购买的种子
+            if plant["isVip"] == 0:
+                continue
+            # 跳过未解锁购买的种子
+            if plant["isBuy"] == 0:
+                continue
+            # 字符串筛选
+            if filterStr and filterStr not in plant["name"]:
+                continue
+            filteredPlants.append(plant)
+
+        # 计算分页
+        totalCount = len(filteredPlants)
+        pageCount = math.ceil(totalCount / 15) if totalCount else 1
+        startIndex = (page - 1) * 15
+        pageItems = filteredPlants[startIndex : startIndex + 15]
+
+        # 构建数据行
+        dataList = []
+        for plant in pageItems:
+            # 图标处理
+            icon = ""
+            iconPath = g_sResourcePath / f"plant/{plant['name']}/icon.png"
+            if iconPath.exists():
+                icon = (iconPath, 33, 33)
+
+            # 交易行标记
+            sell = "可以" if plant["sell"] else "不可以"
+
+            dataList.append(
+                [
+                    icon,
+                    plant["name"],  # 种子名称
+                    plant["vipBuy"],  # 点券种子单价
+                    plant["level"],  # 解锁等级
+                    plant["price"],  # 果实单价
+                    plant["experience"],  # 收获经验
+                    plant["harvest"],  # 收获数量
+                    plant["time"],  # 成熟时间（小时）
+                    plant["crop"],  # 收获次数
+                    sell,  # 是否可上架交易行
+                ]
+            )
+
+        # 页码标题
+        title = f"种子商店 页数: {page}/{pageCount}"
+
+        # 渲染表格并返回图片bytes
+        result = await ImageTemplate.table_page(
+            title,
+            "购买示例：@小真寻 购买种子 澳洲青苹果 5",
+            columnName,
+            dataList,
+        )
+        return result.pic2bytes()
 
 
 g_pShopManager = CShopManager()

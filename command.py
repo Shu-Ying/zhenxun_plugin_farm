@@ -99,6 +99,7 @@ diuse_farm = on_alconna(
         Subcommand("point-to-vipPoint", Args["num?", int], help_text="点券兑换"),
         Subcommand("my-vipPoint", help_text="我的点券"),
         Subcommand("farm-help", help_text="农场帮助"),
+        Subcommand("vipSeed-shop", Args["res?", MultiVar(str)], help_text="种子商店"),
     ),
     priority=5,
     block=True,
@@ -713,3 +714,49 @@ async def _(session: Uninfo):
     image = BuildImage(background=savePath)
 
     await MessageUtils.build_message(image).send(reply_to=True)
+
+
+diuse_farm.shortcut(
+    "点券商店(.*?)",
+    command="我的农场",
+    arguments=["vipSeed-shop"],
+    prefix=True,
+)
+
+
+@diuse_farm.assign("vipSeed-shop")
+async def _(session: Uninfo, res: Match[tuple[str, ...]]):
+    uid = str(session.user.id)
+
+    if not await g_pToolManager.isRegisteredByUid(uid):
+        return
+
+    if res.result is inspect._empty:
+        raw = []
+    else:
+        raw = res.result
+
+    filterKey: str | int | None = None
+    page: int = 1
+
+    if len(raw) >= 1 and raw[0] is not None:
+        first = raw[0]
+        if isinstance(first, str) and first.isdigit():
+            page = int(first)
+        else:
+            filterKey = first
+
+    if (
+        len(raw) >= 2
+        and raw[1] is not None
+        and isinstance(raw[1], str)
+        and raw[1].isdigit()
+    ):
+        page = int(raw[1])
+
+    if filterKey is None:
+        image = await g_pShopManager.getVipSeedShopImage(page)
+    else:
+        image = await g_pShopManager.getVipSeedShopImage(filterKey, page)
+
+    await MessageUtils.build_message(image).send()
