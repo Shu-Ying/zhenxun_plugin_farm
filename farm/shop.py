@@ -8,7 +8,9 @@ from ..dbService import g_pDBService
 
 class CShopManager:
     @classmethod
-    async def getSeedShopImage(cls, filterKey: str | int = 1, num: int = 1) -> bytes:
+    async def getSeedShopImage(
+        cls, filterKey: str | int = 1, num: int = 1, isVip: int = 0
+    ) -> bytes:
         """获取商店页面
 
         Args:
@@ -33,7 +35,6 @@ class CShopManager:
             "-",
             "种子名称",
             "农场币",
-            "点券",
             "解锁等级",
             "果实单价",
             "收获经验",
@@ -46,14 +47,33 @@ class CShopManager:
         # 查询所有可购买作物，并根据筛选关键字过滤
         plants = await g_pDBService.plant.listPlants()
         filteredPlants = []
-        for plant in plants:
-            # 跳过未解锁购买的种子
-            if plant["isBuy"] == 0:
-                continue
-            # 字符串筛选
-            if filterStr and filterStr not in plant["name"]:
-                continue
-            filteredPlants.append(plant)
+
+        # 如果是点券商店
+        if isVip:
+            columnName[2] = "点券"
+            for plant in plants:
+                # 只留下点券购买的种子
+                if plant["isVip"] == 0:
+                    continue
+                # 跳过未解锁购买的种子
+                if plant["isBuy"] == 0:
+                    continue
+                # 字符串筛选
+                if filterStr and filterStr not in plant["name"]:
+                    continue
+                filteredPlants.append(plant)
+        else:
+            for plant in plants:
+                # 只留下农场币购买的种子
+                if plant["isVip"] == 1:
+                    continue
+                # 跳过未解锁购买的种子
+                if plant["isBuy"] == 0:
+                    continue
+                # 字符串筛选
+                if filterStr and filterStr not in plant["name"]:
+                    continue
+                filteredPlants.append(plant)
 
         # 计算分页
         totalCount = len(filteredPlants)
@@ -78,7 +98,6 @@ class CShopManager:
                     icon,
                     plant["name"],  # 种子名称
                     plant["buy"],  # 农场币种子单价
-                    plant["vipBuy"],  # 点券种子单价
                     plant["level"],  # 解锁等级
                     plant["price"],  # 果实单价
                     plant["experience"],  # 收获经验
@@ -88,6 +107,8 @@ class CShopManager:
                     sell,  # 是否可上架交易行
                 ]
             )
+            if isVip:
+                dataList[-1][2] = plant["vipBuy"]  # 点券种子单价
 
         # 页码标题
         title = f"种子商店 页数: {page}/{pageCount}"
