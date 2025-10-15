@@ -201,9 +201,9 @@ async def _(session: Uninfo, res: Match[tuple[str, ...]]):
         page = int(raw[1])
 
     if filterKey is None:
-        image = await g_pShopManager.getSeedShopImage(page)
+        image = await g_pShopManager.getSeedShopImage(page, 0, 0)
     else:
-        image = await g_pShopManager.getSeedShopImage(filterKey, page)
+        image = await g_pShopManager.getSeedShopImage(filterKey, page, 0)
 
     await MessageUtils.build_message(image).send()
 
@@ -755,8 +755,8 @@ async def _(session: Uninfo, res: Match[tuple[str, ...]]):
         page = int(raw[1])
 
     if filterKey is None:
-        image = await g_pShopManager.getVipSeedShopImage(page)
+        image = await g_pShopManager.getSeedShopImage(page, 0, 1)
     else:
-        image = await g_pShopManager.getVipSeedShopImage(filterKey, page)
+        image = await g_pShopManager.getSeedShopImage(filterKey, page, 1)
 
     await MessageUtils.build_message(image).send()
