@@ -1,25 +1,31 @@
-import os
 from datetime import datetime
+import os
 from zoneinfo import ZoneInfo
 
 from zhenxun.services.log import logger
 from zhenxun.utils.message import MessageUtils
 
-from .dbService import g_pDBService
+from ..core.player.player import CPlayer
+from ..core.player.playerPool import g_pUserPool
 
 
 class CToolManager:
     @classmethod
-    async def isRegisteredByUid(cls, uid: str) -> bool:
-        result = await g_pDBService.user.isUserExist(uid)
+    async def repeat(cls):
+        await MessageUtils.build_message(
+            "尚未开通农场，快at我发送 开通农场 开通吧"
+        ).send()
 
-        if not result:
-            await MessageUtils.build_message(
-                "尚未开通农场，快at我发送 开通农场 开通吧"
-            ).send()
-            return False
+    @classmethod
+    async def getPlayerByUid(cls, uid: str) -> CPlayer | None:
+        player = g_pUserPool.getUser(uid)
+        if player is None:
+            player = CPlayer()
+            if not await player.init(uid):
+                return None
+            g_pUserPool.createUser(uid, player)
 
-        return True
+        return player
 
     @classmethod
     def sanitize_username(cls, username: str, max_length: int = 15) -> str:

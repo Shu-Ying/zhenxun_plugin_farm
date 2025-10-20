@@ -7,14 +7,15 @@ from zhenxun.services.log import logger
 from zhenxun.utils.message import MessageUtils
 
 from .command import diuse_farm, diuse_register, reclamation
-from .database.database import g_pSqlManager
-from .dbService import g_pDBService
+from .core.database.database import g_pSqlManager
+from .core.dbService import g_pDBService
+from .core.farm import g_pFarmManager
+from .core.help import g_pHelpManager
+from .core.player.playerPool import g_pUserPool
+from .core.shop import g_pShopManager
 from .event.event import g_pEventManager
-from .farm.farm import g_pFarmManager
-from .farm.help import g_pHelpManager
-from .farm.shop import g_pShopManager
-from .json import g_pJsonManager
-from .request import g_pRequestManager
+from .utils.json import g_pJsonManager
+from .utils.request import g_pRequestManager
 
 __plugin_meta__ = PluginMetadata(
     name="真寻农场",
@@ -86,12 +87,13 @@ driver = get_driver()
 # 构造函数
 @driver.on_startup
 async def start():
-    # 初始化数据库
+    # 数据库加载
     await g_pSqlManager.init()
 
     # 初始化读取Json
     await g_pJsonManager.init()
 
+    # 初始化数据库变量 和 加载作物数据库
     await g_pDBService.init()
 
     # 检查作物文件是否缺失 or 更新
@@ -103,9 +105,10 @@ async def start():
 # 析构函数
 @driver.on_shutdown
 async def shutdown():
-    await g_pSqlManager.cleanup()
-
+    # 单独卸载 作物数据库
     await g_pDBService.cleanup()
+
+    await g_pSqlManager.cleanup()
 
 
 @scheduler.scheduled_job(trigger="cron", hour=4, minute=30, id="signInFile")

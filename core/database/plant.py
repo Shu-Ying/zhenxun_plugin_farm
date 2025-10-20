@@ -6,8 +6,8 @@ import aiosqlite
 from zhenxun.configs.config import Config
 from zhenxun.services.log import logger
 
-from ..config import g_bIsDebug, g_sPlantPath, g_sResourcePath
-from ..request import g_pRequestManager
+from ...utils.config import g_bIsDebug, g_sPlantPath, g_sResourcePath
+from ...utils.request import g_pRequestManager
 
 
 class CPlantManager:
@@ -17,43 +17,39 @@ class CPlantManager:
         except FileExistsError:
             pass
 
-    @classmethod
-    async def cleanup(cls):
-        if hasattr(cls, "m_pDB") and cls.m_pDB:
-            await cls.m_pDB.close()
+    async def cleanup(self):
+        if hasattr(self, "m_pDB") and self.m_pDB:
+            await self.m_pDB.close()
 
-    @classmethod
-    async def init(cls) -> bool:
+    async def init(self) -> bool:
         try:
             _ = os.path.exists(g_sPlantPath)
 
             if g_bIsDebug:
-                cls.m_pDB = await aiosqlite.connect(
+                self.m_pDB = await aiosqlite.connect(
                     str(g_sPlantPath.parent / "plant-test.db")
                 )
             else:
-                cls.m_pDB = await aiosqlite.connect(str(g_sPlantPath))
+                self.m_pDB = await aiosqlite.connect(str(g_sPlantPath))
 
-            cls.m_pDB.row_factory = aiosqlite.Row
+            self.m_pDB.row_factory = aiosqlite.Row
             return True
         except Exception as e:
             logger.warning("初始化植物数据库失败", e=e)
             return False
 
-    @classmethod
     @asynccontextmanager
-    async def _transaction(cls):
-        await cls.m_pDB.execute("BEGIN;")
+    async def _transaction(self):
+        await self.m_pDB.execute("BEGIN;")
         try:
             yield
         except:
-            await cls.m_pDB.execute("ROLLBACK;")
+            await self.m_pDB.execute("ROLLBACK;")
             raise
         else:
-            await cls.m_pDB.execute("COMMIT;")
+            await self.m_pDB.execute("COMMIT;")
 
-    @classmethod
-    async def executeDB(cls, command: str) -> bool:
+    async def executeDB(self, command: str) -> bool:
         """执行自定义SQL
 
         Args:
@@ -67,15 +63,14 @@ class CPlantManager:
             return False
 
         try:
-            async with cls._transaction():
-                await cls.m_pDB.execute(command)
+            async with self._transaction():
+                await self.m_pDB.execute(command)
             return True
         except Exception as e:
             logger.warning(f"数据库语句执行出错: {command}", e=e)
             return False
 
-    @classmethod
-    async def getPlantByName(cls, name: str) -> dict | None:
+    async def getPlantByName(self, name: str) -> dict | None:
         """根据作物名称查询记录
 
         Args:
@@ -85,7 +80,7 @@ class CPlantManager:
             dict | None: 返回记录字典，未找到返回None
         """
         try:
-            async with cls.m_pDB.execute(
+            async with self.m_pDB.execute(
                 "SELECT * FROM plant WHERE name = ?", (name,)
             ) as cursor:
                 row = await cursor.fetchone()
@@ -94,8 +89,7 @@ class CPlantManager:
             logger.warning(f"查询作物失败: {name}", e=e)
             return None
 
-    @classmethod
-    async def getPlantPhaseByName(cls, name: str) -> list[int]:
+    async def getPlantPhaseByName(self, name: str) -> list[int]:
         """根据作物名称获取作物各个阶段
 
         Args:
@@ -105,7 +99,7 @@ class CPlantManager:
             list: 阶段数组
         """
         try:
-            async with cls.m_pDB.execute(
+            async with self.m_pDB.execute(
                 "SELECT phase FROM plant WHERE name = ?", (name,)
             ) as cursor:
                 row = await cursor.fetchone()
@@ -130,8 +124,7 @@ class CPlantManager:
             logger.warning(f"查询作物阶段失败: {name}", e=e)
             return []
 
-    @classmethod
-    async def getPlantPhaseNumberByName(cls, name: str) -> int:
+    async def getPlantPhaseNumberByName(self, name: str) -> int:
         """根据作物名称获取作物总阶段数
 
         Args:
@@ -141,7 +134,7 @@ class CPlantManager:
             int: 总阶段数
         """
         try:
-            async with cls.m_pDB.execute(
+            async with self.m_pDB.execute(
                 "SELECT phase FROM plant WHERE name = ?", (name,)
             ) as cursor:
                 row = await cursor.fetchone()
@@ -164,8 +157,7 @@ class CPlantManager:
             logger.warning(f"查询作物阶段失败: {name}", e=e)
             return -1
 
-    @classmethod
-    async def getPlantAgainByName(cls, name: str) -> int:
+    async def getPlantAgainByName(self, name: str) -> int:
         """根据作物名称获取作物再次成熟时间
 
         Args:
@@ -176,7 +168,7 @@ class CPlantManager:
         """
 
         try:
-            async with cls.m_pDB.execute(
+            async with self.m_pDB.execute(
                 "SELECT phase FROM plant WHERE name = ?", (name,)
             ) as cursor:
                 row = await cursor.fetchone()
@@ -193,8 +185,7 @@ class CPlantManager:
             logger.warning(f"查询作物阶段失败: {name}", e=e)
             return -1
 
-    @classmethod
-    async def existsPlant(cls, name: str) -> bool:
+    async def existsPlant(self, name: str) -> bool:
         """判断作物是否存在
 
         Args:
@@ -204,7 +195,7 @@ class CPlantManager:
             bool: 存在返回True，否则False
         """
         try:
-            async with cls.m_pDB.execute(
+            async with self.m_pDB.execute(
                 "SELECT 1 FROM plant WHERE name = ? LIMIT 1", (name,)
             ) as cursor:
                 row = await cursor.fetchone()
@@ -213,8 +204,7 @@ class CPlantManager:
             logger.warning(f"检查作物存在性失败: {name}", e=e)
             return False
 
-    @classmethod
-    async def countPlants(cls, onlyBuy: bool = False) -> int:
+    async def countPlants(self, onlyBuy: bool = False) -> int:
         """获取作物总数
 
         Args:
@@ -230,18 +220,17 @@ class CPlantManager:
             else:
                 sql = "SELECT COUNT(*) FROM plant"
                 params: tuple = ()
-            async with cls.m_pDB.execute(sql, params) as cursor:
+            async with self.m_pDB.execute(sql, params) as cursor:
                 row = await cursor.fetchone()
                 return row[0] if row else 0
         except Exception as e:
             logger.warning(f"统计作物数量失败, onlyBuy={onlyBuy}", e=e)
             return 0
 
-    @classmethod
-    async def listPlants(cls) -> list[dict]:
+    async def listPlants(self) -> list[dict]:
         """查询所有作物记录"""
         try:
-            async with cls.m_pDB.execute(
+            async with self.m_pDB.execute(
                 "SELECT * FROM plant ORDER BY level"
             ) as cursor:
                 rows = await cursor.fetchall()
@@ -250,8 +239,7 @@ class CPlantManager:
             logger.warning("查询所有作物失败", e=e)
             return []
 
-    @classmethod
-    async def downloadPlant(cls) -> bool:
+    async def downloadPlant(self) -> bool:
         """遍历所有作物，下载各阶段图片及icon文件到指定文件夹
 
         Returns:
@@ -262,10 +250,10 @@ class CPlantManager:
 
         baseUrl = baseUrl.rstrip("/") + ":8998/file"
         try:
-            plants = await cls.listPlants()
+            plants = await self.listPlants()
             for plant in plants:
                 name = plant["name"]
-                phaseCount = await cls.getPlantPhaseNumberByName(name)
+                phaseCount = await self.getPlantPhaseNumberByName(name)
                 saveDir = os.path.join(g_sResourcePath, "plant", name)
                 begin = 0 if plant["general"] == 0 else 1
 

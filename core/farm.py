@@ -9,11 +9,11 @@ from zhenxun.utils.enum import GoldHandle
 from zhenxun.utils.image_utils import ImageTemplate
 from zhenxun.utils.platform import PlatformUtils
 
-from ..config import g_bIsDebug, g_iSoilLevelMax, g_sResourcePath, g_sTranslation
-from ..dbService import g_pDBService
+from ..core.dbService import g_pDBService
 from ..event.event import g_pEventManager
-from ..json import g_pJsonManager
-from ..tool import g_pToolManager
+from ..utils.config import g_bIsDebug, g_iSoilLevelMax, g_sResourcePath, g_sTranslation
+from ..utils.json import g_pJsonManager
+from ..utils.tool import g_pToolManager
 
 
 class CFarmManager:
@@ -36,20 +36,27 @@ class CFarmManager:
             return f"你的金币不足或不足承担手续费。当前手续费为{fee}"
 
         await UserConsole.reduce_gold(
-            uid, num, GoldHandle.PLUGIN, "zhenxun_plugin_farm"
+            uid,
+            num,
+            GoldHandle.PLUGIN,  # type: ignore
+            "zhenxun_plugin_farm",
         )
         await UserConsole.reduce_gold(
-            uid, fee, GoldHandle.PLUGIN, "zhenxun_plugin_farm"
-        )  # type: ignore
+            uid,
+            fee,
+            GoldHandle.PLUGIN,  # type: ignore
+            "zhenxun_plugin_farm",
+        )
 
         point = num * pro
+        player = await g_pToolManager.getPlayerByUid(uid)
+        if not player:
+            return g_sTranslation["basic"]["error"]
 
-        p = await g_pDBService.user.getUserPointByUid(uid)
-        number = point + p
+        p = player.user.get("point", 0)
+        await player.addPoint("point", point + p)
 
-        await g_pDBService.user.updateUserPointByUid(uid, int(number))
-
-        return f"充值{point}农场币成功，手续费{tax}金币，当前农场币：{number}"
+        return f"充值{point}农场币成功，手续费{tax}金币，当前农场币：{point + p}"
 
     @classmethod
     async def drawFarmByUid(cls, uid: str) -> bytes:
@@ -69,9 +76,11 @@ class CFarmManager:
         await grass.resize(0, soilSize[0], soilSize[1])
 
         soilPos = g_pJsonManager.m_pSoil["soil"]
+        player = await g_pToolManager.getPlayerByUid(uid)
+        if not player:
+            return img.pic2bytes()
 
-        userInfo = await g_pDBService.user.getUserInfoByUid(uid)
-        soilUnlock = int(userInfo["soil"])
+        soilUnlock = int(player.user.get("soil", 3))
 
         x = 0
         y = 0
@@ -168,12 +177,12 @@ class CFarmManager:
 
         # 用户名
         nameImg = await BuildImage.build_text_image(
-            userInfo["name"], size=24, font_color=(77, 35, 4)
+            player.user["name"], size=24, font_color=(77, 35, 4)
         )
         await img.paste(nameImg, (300, 92))
 
         # 经验值
-        level = await g_pDBService.user.getUserLevelByUid(uid)
+        level = await player.getUserLevel()
 
         beginX = 309
         endX = 627
@@ -194,7 +203,7 @@ class CFarmManager:
 
         # 金币
         pointImg = await BuildImage.build_text_image(
-            str(userInfo["point"]), size=24, font_color=(253, 253, 253)
+            str(player.user["point"]), size=24, font_color=(253, 253, 253)
         )
         await img.paste(pointImg, (330, 255))
 
@@ -220,8 +229,10 @@ class CFarmManager:
     @classmethod
     async def drawDetailFarmByUid(cls, uid: str) -> list:
         info = []
-
         farm = await cls.drawFarmByUid(uid)
+        player = await g_pToolManager.getPlayerByUid(uid)
+        if not player:
+            return info
 
         info.append(BuildImage.open(farm))
 
@@ -238,7 +249,7 @@ class CFarmManager:
         ]
 
         icon = ""
-        soilNumber = await g_pDBService.user.getUserSoilByUid(uid)
+        soilNumber = player.user.get("soil", 3)
 
         for i in range(1, soilNumber + 1):
             soilInfo = await g_pDBService.userSoil.getUserSoil(uid, i)
@@ -490,7 +501,10 @@ class CFarmManager:
                 return g_sTranslation["sowing"]["noNum"].format(name=name, num=count)
 
             # 获取用户土地数量
-            soilNumber = await g_pDBService.user.getUserSoilByUid(uid)
+            player = await g_pToolManager.getPlayerByUid(uid)
+            if not player:
+                return g_sTranslation["basic"]["error"]
+            soilNumber = player.user.get("soil", 3)
 
             # 如果播种数量为 -1，表示播种所有可播种的土地
             if num == -1:
@@ -546,7 +560,10 @@ class CFarmManager:
         try:
             await g_pEventManager.m_beforeHarvest.emit(uid=uid)  # type: ignore
 
-            soilNumber = await g_pDBService.user.getUserSoilByUid(uid)
+            player = await g_pToolManager.getPlayerByUid(uid)
+            if not player:
+                return g_sTranslation["basic"]["error"]
+            soilNumber = player.user.get("soil", 3)
 
             harvestRecords = []  # 收获日志记录
             experience = 0  # 总经验值
@@ -644,8 +661,8 @@ class CFarmManager:
                     )
 
             if experience > 0:
-                exp = await g_pDBService.user.getUserExpByUid(uid)
-                await g_pDBService.user.updateUserExpByUid(uid, exp + experience)
+                exp = player.user.get("exp", 0)
+                await player.addExp(exp + experience)
                 harvestRecords.append(
                     g_sTranslation["harvest"]["exp"].format(
                         exp=experience,
@@ -671,7 +688,10 @@ class CFarmManager:
         Returns:
             str: 返回
         """
-        soilNumber = await g_pDBService.user.getUserSoilByUid(uid)
+        player = await g_pToolManager.getPlayerByUid(uid)
+        if not player:
+            return g_sTranslation["basic"]["error"]
+        soilNumber = player.user.get("soil", 3)
 
         await g_pEventManager.m_beforeEradicate.emit(uid=uid)  # type: ignore
 
@@ -715,8 +735,8 @@ class CFarmManager:
             await g_pEventManager.m_afterEradicate.emit(uid=uid, soilIndex=i)  # type: ignore
 
         if experience > 0:
-            exp = await g_pDBService.user.getUserExpByUid(uid)
-            await g_pDBService.user.updateUserExpByUid(uid, exp + experience)
+            exp = player.user.get("exp", 0)
+            await player.addExp(exp + experience)
 
             return g_sTranslation["eradicate"]["success"].format(exp=experience)
         else:
@@ -828,10 +848,12 @@ class CFarmManager:
             str: 返回
         """
         # 用户信息
-        userInfo = await g_pDBService.user.getUserInfoByUid(uid)
+        player = await g_pToolManager.getPlayerByUid(uid)
+        if not player:
+            return g_sTranslation["basic"]["error"]
 
-        stealTime = userInfo.get("stealTime", "")
-        stealCount = int(userInfo["stealCount"])
+        stealTime = player.user.get("stealTime", "")
+        stealCount = int(player.user["stealCount"])
 
         if stealTime == "" or not stealTime:
             stealTime = g_pToolManager.dateTime().date().today().strftime("%Y-%m-%d")

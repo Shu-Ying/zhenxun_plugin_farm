@@ -5,10 +5,10 @@ import random
 from zhenxun.services.log import logger
 from zhenxun.utils._build_image import BuildImage
 
-from ..config import g_bIsDebug
+from ...utils.config import g_bIsDebug
+from ...utils.json import g_pJsonManager
+from ...utils.tool import g_pToolManager
 from ..dbService import g_pDBService
-from ..json import g_pJsonManager
-from ..tool import g_pToolManager
 from .database import CSqlManager
 
 

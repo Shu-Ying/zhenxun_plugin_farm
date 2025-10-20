@@ -2,8 +2,9 @@ import math
 
 from zhenxun.utils.image_utils import ImageTemplate
 
-from ..config import g_sResourcePath, g_sTranslation
-from ..dbService import g_pDBService
+from ..core.dbService import g_pDBService
+from ..utils.config import g_sResourcePath, g_sTranslation
+from ..utils.tool import g_pToolManager
 
 
 class CShopManager:
@@ -113,48 +114,39 @@ class CShopManager:
         Returns:
             str:
         """
-
         if num <= 0:
             return g_sTranslation["buySeed"]["notNum"]
 
+        player = await g_pToolManager.getPlayerByUid(uid)
         plantInfo = await g_pDBService.plant.getPlantByName(name)
-        if not plantInfo:
+        if not plantInfo or not player:
             return g_sTranslation["buySeed"]["error"]
 
-        level = await g_pDBService.user.getUserLevelByUid(uid)
+        level = player.user.get("level", 0)
 
-        if level[0] < int(plantInfo["level"]):
+        if level < int(plantInfo["level"]):
             return g_sTranslation["buySeed"]["noLevel"]
 
-        """
-        logger.debug(
-            f"用户：{uid}购买{name}，数量为{num}。用户农场币为{point}，购买需要{total}"
-        )
-        """
-        if plantInfo["isVip"] == 1:
-            vipPoint = await g_pDBService.user.getUserVipPointByUid(uid)
-            total = int(plantInfo["vipBuy"]) * num
-            if vipPoint < total:
-                return g_sTranslation["buySeed"]["noVipPoint"]
-            await g_pDBService.user.updateUserVipPointByUid(uid, vipPoint - total)
-        else:
-            point = await g_pDBService.user.getUserPointByUid(uid)
-            total = int(plantInfo["buy"]) * num
-            if point < total:
-                return g_sTranslation["buySeed"]["noPoint"]
-            await g_pDBService.user.updateUserPointByUid(uid, point - total)
+        vipSeed = plantInfo.get("isVip", 0) == 1
+        currencyType = "vipPoint" if vipSeed else "point"
+        price = int(plantInfo["vipBuy" if vipSeed else "buy"])
+        totalCost = price * num
+
+        currentCurrency = player.user.get(currencyType, 0)
+        if currentCurrency < totalCost:
+            return g_sTranslation["buySeed"][f"no{'Vip' if vipSeed else ''}Point"]
+
+        await player.addPoint(currencyType, currentCurrency - totalCost)
 
         if not await g_pDBService.userSeed.addUserSeedByUid(uid, name, num):
             return g_sTranslation["buySeed"]["errorSql"]
 
-        if plantInfo["isVip"] == 1:
-            return g_sTranslation["buySeed"]["vipSuccess"].format(
-                name=name, total=total, point=vipPoint - total
-            )
-        else:
-            return g_sTranslation["buySeed"]["success"].format(
-                name=name, total=total, point=point - total
-            )
+        success_key = "vipSuccess" if vipSeed else "success"
+        remaining_currency = currentCurrency - totalCost
+
+        return g_sTranslation["buySeed"][success_key].format(
+            name=name, total=totalCost, point=remaining_currency
+        )
 
     @classmethod
     async def sellPlantByUid(cls, uid: str, name: str = "", num: int = 1) -> str:
@@ -215,17 +207,18 @@ class CShopManager:
 
             totalPoint = totalSold * price
 
-        currentPoint = await g_pDBService.user.getUserPointByUid(uid)
-        await g_pDBService.user.updateUserPointByUid(uid, currentPoint + totalPoint)
+        player = await g_pToolManager.getPlayerByUid(uid)
+        if not player:
+            return g_sTranslation["basic"]["error"]
 
-        if name == "":
-            return g_sTranslation["sellPlant"]["success"].format(
-                point=totalPoint, num=currentPoint + totalPoint
-            )
-        else:
-            return g_sTranslation["sellPlant"]["success1"].format(
-                name=name, point=totalPoint, num=currentPoint + totalPoint
-            )
+        currentPoint = player.user.get("point", 0)
+        await player.addPoint("point", currentPoint + totalPoint)
+
+        result = "success1" if name == "" else "success"
+
+        return g_sTranslation["sellPlant"][result].format(
+            point=totalPoint, num=currentPoint + totalPoint
+        )
 
 
 g_pShopManager = CShopManager()

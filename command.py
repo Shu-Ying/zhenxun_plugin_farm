@@ -24,12 +24,12 @@ from zhenxun.services.log import logger
 from zhenxun.utils._build_image import BuildImage
 from zhenxun.utils.message import MessageUtils
 
-from .config import g_bSignStatus, g_sTranslation
-from .dbService import g_pDBService
-from .farm.farm import g_pFarmManager
-from .farm.shop import g_pShopManager
-from .json import g_pJsonManager
-from .tool import g_pToolManager
+from .core.dbService import g_pDBService
+from .core.farm import g_pFarmManager
+from .core.shop import g_pShopManager
+from .utils.config import g_bSignStatus, g_sTranslation
+from .utils.json import g_pJsonManager
+from .utils.tool import g_pToolManager
 
 diuse_register = on_alconna(
     Alconna("开通农场"),
@@ -43,22 +43,19 @@ diuse_register = on_alconna(
 @diuse_register.handle()
 async def handle_register(session: Uninfo):
     uid = str(session.user.id)
-    user = await g_pDBService.user.getUserInfoByUid(uid)
+    player = await g_pToolManager.getPlayerByUid(uid)
 
-    if user:
-        await MessageUtils.build_message(g_sTranslation["register"]["repeat"]).send(
-            reply_to=True
-        )
+    if player is None or await player.isRegistered():
+        await g_pToolManager.repeat()
         return
 
     try:
         raw_name = str(session.user.name)
         safe_name = g_pToolManager.sanitize_username(raw_name)
 
-        # 初始化用户信息
-        success = await g_pDBService.user.initUserInfoByUid(
-            uid=uid, name=safe_name, exp=0, point=500
-        )
+        success = await g_pDBService.user.initUserInfo(uid, safe_name)
+
+        logger.info(f"用户 {uid} 选择的农场名称为: {raw_name} | 过滤后为: {safe_name}")
 
         msg = (
             g_sTranslation["register"]["success"].format(point=500)
@@ -109,8 +106,10 @@ diuse_farm = on_alconna(
 @diuse_farm.assign("$main")
 async def _(session: Uninfo):
     uid = str(session.user.id)
+    player = await g_pToolManager.getPlayerByUid(uid)
 
-    if not await g_pToolManager.isRegisteredByUid(uid):
+    if player is None or await player.isRegistered():
+        await g_pToolManager.repeat()
         return
 
     image = await g_pFarmManager.drawFarmByUid(uid)
@@ -128,8 +127,10 @@ diuse_farm.shortcut(
 @diuse_farm.assign("detail")
 async def _(session: Uninfo):
     uid = str(session.user.id)
+    player = await g_pToolManager.getPlayerByUid(uid)
 
-    if not await g_pToolManager.isRegisteredByUid(uid):
+    if player is None or await player.isRegistered():
+        await g_pToolManager.repeat()
         return
 
     info = await g_pFarmManager.drawDetailFarmByUid(uid)
@@ -150,7 +151,13 @@ diuse_farm.shortcut(
 @diuse_farm.assign("my-point")
 async def _(session: Uninfo):
     uid = str(session.user.id)
-    point = await g_pDBService.user.getUserPointByUid(uid)
+    player = await g_pToolManager.getPlayerByUid(uid)
+
+    if player is None or await player.isRegistered():
+        await g_pToolManager.repeat()
+        return
+
+    point = player.user["point"]
 
     if point < 0:
         await MessageUtils.build_message(g_sTranslation["basic"]["notFarm"]).send()
@@ -172,8 +179,10 @@ diuse_farm.shortcut(
 @diuse_farm.assign("seed-shop")
 async def _(session: Uninfo, res: Match[tuple[str, ...]]):
     uid = str(session.user.id)
+    player = await g_pToolManager.getPlayerByUid(uid)
 
-    if not await g_pToolManager.isRegisteredByUid(uid):
+    if player is None or await player.isRegistered():
+        await g_pToolManager.repeat()
         return
 
     if res.result is inspect._empty:
@@ -225,8 +234,10 @@ async def _(
         )
 
     uid = str(session.user.id)
+    player = await g_pToolManager.getPlayerByUid(uid)
 
-    if not await g_pToolManager.isRegisteredByUid(uid):
+    if player is None or await player.isRegistered():
+        await g_pToolManager.repeat()
         return
 
     result = await g_pShopManager.buySeed(uid, name.result, num.result)
@@ -244,8 +255,10 @@ diuse_farm.shortcut(
 @diuse_farm.assign("my-seed")
 async def _(session: Uninfo):
     uid = str(session.user.id)
+    player = await g_pToolManager.getPlayerByUid(uid)
 
-    if not await g_pToolManager.isRegisteredByUid(uid):
+    if player is None or await player.isRegistered():
+        await g_pToolManager.repeat()
         return
 
     result = await g_pFarmManager.getUserSeedByUid(uid)
@@ -270,8 +283,10 @@ async def _(
         )
 
     uid = str(session.user.id)
+    player = await g_pToolManager.getPlayerByUid(uid)
 
-    if not await g_pToolManager.isRegisteredByUid(uid):
+    if player is None or await player.isRegistered():
+        await g_pToolManager.repeat()
         return
 
     result = await g_pFarmManager.sowing(uid, name.result, num.result)
@@ -289,8 +304,10 @@ diuse_farm.shortcut(
 @diuse_farm.assign("harvest")
 async def _(session: Uninfo):
     uid = str(session.user.id)
+    player = await g_pToolManager.getPlayerByUid(uid)
 
-    if not await g_pToolManager.isRegisteredByUid(uid):
+    if player is None or await player.isRegistered():
+        await g_pToolManager.repeat()
         return
 
     result = await g_pFarmManager.harvest(uid)
@@ -308,8 +325,10 @@ diuse_farm.shortcut(
 @diuse_farm.assign("eradicate")
 async def _(session: Uninfo):
     uid = str(session.user.id)
+    player = await g_pToolManager.getPlayerByUid(uid)
 
-    if not await g_pToolManager.isRegisteredByUid(uid):
+    if player is None or await player.isRegistered():
+        await g_pToolManager.repeat()
         return
 
     result = await g_pFarmManager.eradicate(uid)
@@ -327,8 +346,10 @@ diuse_farm.shortcut(
 @diuse_farm.assign("my-plant")
 async def _(session: Uninfo):
     uid = str(session.user.id)
+    player = await g_pToolManager.getPlayerByUid(uid)
 
-    if not await g_pToolManager.isRegisteredByUid(uid):
+    if player is None or await player.isRegistered():
+        await g_pToolManager.repeat()
         return
 
     result = await g_pFarmManager.getUserPlantByUid(uid)
@@ -346,8 +367,10 @@ diuse_farm.shortcut(
 @diuse_farm.assign("lock-plant")
 async def _(session: Uninfo, name: Match[str]):
     uid = str(session.user.id)
+    player = await g_pToolManager.getPlayerByUid(uid)
 
-    if not await g_pToolManager.isRegisteredByUid(uid):
+    if player is None or await player.isRegistered():
+        await g_pToolManager.repeat()
         return
 
     result = await g_pFarmManager.lockUserPlantByUid(uid, name.result, 1)
@@ -365,8 +388,10 @@ diuse_farm.shortcut(
 @diuse_farm.assign("unlock-plant")
 async def _(session: Uninfo, name: Match[str]):
     uid = str(session.user.id)
+    player = await g_pToolManager.getPlayerByUid(uid)
 
-    if not await g_pToolManager.isRegisteredByUid(uid):
+    if player is None or await player.isRegistered():
+        await g_pToolManager.repeat()
         return
 
     result = await g_pFarmManager.lockUserPlantByUid(uid, name.result, 0)
@@ -386,8 +411,10 @@ async def _(
     session: Uninfo, name: Match[str], num: Query[int] = AlconnaQuery("num", -1)
 ):
     uid = str(session.user.id)
+    player = await g_pToolManager.getPlayerByUid(uid)
 
-    if not await g_pToolManager.isRegisteredByUid(uid):
+    if player is None or await player.isRegistered():
+        await g_pToolManager.repeat()
         return
 
     result = await g_pShopManager.sellPlantByUid(uid, name.result, num.result)
@@ -405,8 +432,10 @@ reclamation = on_alconna(
 @reclamation.handle()
 async def _(session: Uninfo):
     uid = str(session.user.id)
+    player = await g_pToolManager.getPlayerByUid(uid)
 
-    if not await g_pToolManager.isRegisteredByUid(uid):
+    if player is None or await player.isRegistered():
+        await g_pToolManager.repeat()
         return
 
     condition = await g_pFarmManager.reclamationCondition(uid)
@@ -441,8 +470,10 @@ diuse_farm.shortcut(
 @diuse_farm.assign("stealing")
 async def _(session: Uninfo, target: Match[At]):
     uid = str(session.user.id)
+    player = await g_pToolManager.getPlayerByUid(uid)
 
-    if not await g_pToolManager.isRegisteredByUid(uid):
+    if player is None or await player.isRegistered():
+        await g_pToolManager.repeat()
         return
 
     if not target.available:
@@ -451,7 +482,7 @@ async def _(session: Uninfo, target: Match[At]):
         )
 
     tar = target.result
-    result = await g_pDBService.user.isUserExist(tar.target)
+    result = await g_pDBService.user.isRegistered(tar.target)
 
     if not result:
         await MessageUtils.build_message(
@@ -479,8 +510,10 @@ async def _(session: Uninfo, num: Query[int] = AlconnaQuery("num", 0)):
         )
 
     uid = str(session.user.id)
+    player = await g_pToolManager.getPlayerByUid(uid)
 
-    if not await g_pToolManager.isRegisteredByUid(uid):
+    if player is None or await player.isRegistered():
+        await g_pToolManager.repeat()
         return
 
     result = await g_pFarmManager.buyPointByUid(uid, num.result)
@@ -503,28 +536,23 @@ async def _(session: Uninfo, name: Match[str]):
         )
 
     uid = str(session.user.id)
+    player = await g_pToolManager.getPlayerByUid(uid)
 
-    if not await g_pToolManager.isRegisteredByUid(uid):
+    if player is None or await player.isRegistered():
+        await g_pToolManager.repeat()
         return
 
-    safeName = g_pToolManager.sanitize_username(name.result)
-
-    if safeName == "神秘农夫":
-        await MessageUtils.build_message(g_sTranslation["changeName"]["error"]).send(
-            reply_to=True
-        )
-        return
-
-    result = await g_pDBService.user.updateUserNameByUid(uid, safeName)
-
-    if result:
-        await MessageUtils.build_message(g_sTranslation["changeName"]["success"]).send(
-            reply_to=True
-        )
-    else:
+    player = await g_pToolManager.getPlayerByUid(uid)
+    if player is None:
         await MessageUtils.build_message(g_sTranslation["changeName"]["error1"]).send(
             reply_to=True
         )
+        return
+
+    result = await player.updateName(name.result)
+    await MessageUtils.build_message(g_sTranslation["changeName"][result]).send(
+        reply_to=True
+    )
 
 
 diuse_farm.shortcut(
@@ -538,8 +566,10 @@ diuse_farm.shortcut(
 @diuse_farm.assign("sign-in")
 async def _(session: Uninfo):
     uid = str(session.user.id)
+    player = await g_pToolManager.getPlayerByUid(uid)
 
-    if not await g_pToolManager.isRegisteredByUid(uid):
+    if player is None or await player.isRegistered():
+        await g_pToolManager.repeat()
         return
 
     # 判断签到是否正常加载
@@ -593,8 +623,6 @@ async def _(session: Uninfo):
 
     await MessageUtils.build_message(message).send()
 
-    # await MessageUtils.alc_forward_msg([info], session.self_id, BotConfig.self_nickname).send(reply_to=True)
-
 
 soil_upgrade = on_alconna(
     Alconna("土地升级", Args["index", int]),
@@ -607,8 +635,10 @@ soil_upgrade = on_alconna(
 @soil_upgrade.handle()
 async def _(session: Uninfo, index: Query[int] = AlconnaQuery("index", 1)):
     uid = str(session.user.id)
+    player = await g_pToolManager.getPlayerByUid(uid)
 
-    if not await g_pToolManager.isRegisteredByUid(uid):
+    if player is None or await player.isRegistered():
+        await g_pToolManager.repeat()
         return
 
     condition = await g_pFarmManager.soilUpgradeCondition(uid, index.result)
@@ -646,8 +676,10 @@ diuse_farm.shortcut(
 @diuse_farm.assign("admin-up")
 async def _(session: Uninfo, num: Query[int] = AlconnaQuery("num", 0)):
     uid = str(session.user.id)
+    player = await g_pToolManager.getPlayerByUid(uid)
 
-    if not await g_pToolManager.isRegisteredByUid(uid):
+    if player is None or await player.isRegistered():
+        await g_pToolManager.repeat()
         return
 
     await g_pDBService.userSoil.nextPhase(uid, num.result)
@@ -669,8 +701,10 @@ async def _(session: Uninfo, num: Query[int] = AlconnaQuery("num", 0)):
         )
 
     uid = str(session.user.id)
+    player = await g_pToolManager.getPlayerByUid(uid)
 
-    if not await g_pToolManager.isRegisteredByUid(uid):
+    if player is None or await player.isRegistered():
+        await g_pToolManager.repeat()
         return
 
     result = await g_pFarmManager.pointToVipPointByUid(uid, num.result)
@@ -688,13 +722,14 @@ diuse_farm.shortcut(
 @diuse_farm.assign("my-vipPoint")
 async def _(session: Uninfo):
     uid = str(session.user.id)
-    vipPoint = await g_pDBService.user.getUserVipPointByUid(uid)
+    player = await g_pToolManager.getPlayerByUid(uid)
 
-    if not await g_pToolManager.isRegisteredByUid(uid):
+    if player is None or await player.isRegistered():
+        await g_pToolManager.repeat()
         return
 
     await MessageUtils.build_message(
-        g_sTranslation["basic"]["vipPoint"].format(vipPoint=vipPoint)
+        g_sTranslation["basic"]["vipPoint"].format(vipPoint=player.user["vipPoint"])
     ).send(reply_to=True)
 
 

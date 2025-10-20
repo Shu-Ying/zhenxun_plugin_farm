@@ -10,11 +10,12 @@ from rich.progress import (
     TimeRemainingColumn,
     TransferSpeedColumn,
 )
+
 from zhenxun.configs.config import Config
 from zhenxun.services.log import logger
 
+from ..core.dbService import g_pDBService
 from .config import g_sPlantPath, g_sSignInPath
-from .dbService import g_pDBService
 from .tool import g_pToolManager
 
 

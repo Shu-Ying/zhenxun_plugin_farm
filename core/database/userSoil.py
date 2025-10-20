@@ -2,9 +2,9 @@ import math
 
 from zhenxun.services.log import logger
 
-from ..config import g_bIsDebug
 from ..dbService import g_pDBService
-from ..tool import g_pToolManager
+from ..utils.config import g_bIsDebug
+from ..utils.tool import g_pToolManager
 from .database import CSqlManager
 
 

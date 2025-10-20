@@ -6,12 +6,12 @@ from playwright.async_api import async_playwright
 from zhenxun.configs.path_config import DATA_PATH
 from zhenxun.services.log import logger
 
-from ..config import g_sResourcePath
+from ..utils.config import g_sResourcePath
 
 
 class CHelpManager:
     @classmethod
-    def rendeerHtmlToFile(
+    def renderHtmlToFile(
         cls, path: Path | str, context: dict, output: Path | str
     ) -> None:
         """
@@ -110,7 +110,7 @@ class CHelpManager:
         }
 
         try:
-            cls.rendeerHtmlToFile(templatePath, context, outputPath)
+            cls.renderHtmlToFile(templatePath, context, outputPath)
 
             bytes = await cls.screenshotSave(str(outputPath), str(savePath), 1500, 2300)
         except Exception as e:

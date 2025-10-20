@@ -44,7 +44,7 @@ class CUserStealDB(CSqlManager):
             return False
 
     @classmethod
-    async def getStealRecordsByUid(cls, uid: str) -> list:
+    async def getStealRecordsByUid(cls, uid: str) -> dict:
         """根据用户Uid获取所有偷菜记录
 
         Args:
@@ -59,20 +59,16 @@ class CUserStealDB(CSqlManager):
                     'SELECT soilIndex, stealerUid, stealCount, stealTime FROM "userSteal" WHERE uid=?;',
                     (uid,),
                 )
-                rows = await cursor.fetchall()
-            return [
-                {
-                    "uid": uid,
-                    "soilIndex": row[0],
-                    "stealerUid": row[1],
-                    "stealCount": row[2],
-                    "stealTime": row[3],
-                }
-                for row in rows
-            ]
+                row = await cursor.fetchone()
+
+                if not row:
+                    return {}
+
+                result = dict(row)
+            return result
         except Exception as e:
             logger.warning("获取偷菜记录失败", e=e)
-            return []
+            return {}
 
     @classmethod
     async def getStealRecord(cls, uid: str, soilIndex: int) -> list:

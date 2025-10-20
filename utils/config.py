@@ -15,13 +15,13 @@ g_sDBPath = DATA_PATH / "farm_db"
 g_sDBFilePath = DATA_PATH / "farm_db/farm.db"
 
 # 农场资源文件目录
-g_sResourcePath = Path(__file__).resolve().parent / "resource"
+g_sResourcePath = Path(__file__).resolve().parent / "../resource"
 
 # 农场作物数据库
 g_sPlantPath = g_sResourcePath / "db/plant.db"
 
 # 农场配置文件目录
-g_sConfigPath = Path(__file__).resolve().parent / "config"
+g_sConfigPath = Path(__file__).resolve().parent / "../config"
 
 # 农场签到文件路径
 g_sSignInPath = g_sConfigPath / "sign_in.json"
@@ -35,6 +35,7 @@ g_sTranslation = {
         "notFarm": "尚未开通农场，快at我发送 开通农场 开通吧 🌱🚜",
         "point": "你的当前农场币为: {point} 🌾💰",
         "vipPoint": "你的当前点券为: {vipPoint} 🌾💰",
+        "error": "❌ 农场功能异常，请稍后再试 💔",
     },
     "register": {
         "success": "✅ 农场开通成功！\n💼 初始资金：{point}农场币 🥳🎉",
