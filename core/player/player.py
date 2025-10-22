@@ -185,7 +185,27 @@ class CPlayer:
 
         return await g_pDBService.user.getUserLevelByUid(uid)
 
-    async def updateField(self, field: str) -> bool:
+    async def updateStealCountByUid(
+        self, uid: str, stealTime: str, stealCount: int
+    ) -> bool:
+        """根据用户Uid更新剩余偷菜次数
+
+        Args:
+            uid (str): 用户Uid
+            stealTime (str): 偷菜日期
+            stealCount (int): 新剩余偷菜次数
+
+        Returns:
+            bool: 是否更新成功
+        """
+        uid = self.user.get("uid", "")
+
+        if uid == "":
+            return False
+
+        return await g_pDBService.user.updateStealCountByUid(uid, stealTime, stealCount)
+
+    async def updateField(self, field: str, value) -> bool:
         """更新单字段信息
 
         Returns:
@@ -196,4 +216,4 @@ class CPlayer:
         if uid == "":
             return False
 
-        return await g_pDBService.farm.updateFarmFieldByUid(uid)
+        return await g_pDBService.user.updateFieldByUid(uid, field, value)

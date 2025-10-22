@@ -124,6 +124,10 @@ class CUserSignDB(CSqlManager):
             bool: 0: 签到失败 1: 签到成功 2: 重复签到
         """
         try:
+            player = await g_pToolManager.getPlayerByUid(uid)
+            if not player:
+                return 0
+
             if not signDate:
                 signDate = g_pToolManager.dateTime().date().today().strftime("%Y-%m-%d")
 
@@ -233,17 +237,11 @@ class CUserSignDB(CSqlManager):
                 exp += 9999
 
             # 向数据库更新
-            currentExp = await g_pDBService.user.getUserExpByUid(uid)
-            await g_pDBService.user.updateUserExpByUid(uid, currentExp + exp)
-
-            currentPoint = await g_pDBService.user.getUserPointByUid(uid)
-            await g_pDBService.user.updateUserPointByUid(uid, currentPoint + point)
+            await player.addExp(exp)
+            await player.addPoint("point", point)
 
             if vipPoint > 0:
-                currentVipPoint = await g_pDBService.user.getUserVipPointByUid(uid)
-                await g_pDBService.user.updateUserVipPointByUid(
-                    uid, currentVipPoint + vipPoint
-                )
+                await player.addPoint("vipPoint", vipPoint)
 
             return 1
         except Exception as e:

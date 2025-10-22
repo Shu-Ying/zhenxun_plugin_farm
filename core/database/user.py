@@ -175,29 +175,25 @@ class CUserDB(CSqlManager):
 
         return level, totalExpNextLevel, currentExp
 
-    async def getUserSoilByUid(self, uid: str) -> int:
-        """获取用户解锁土地数量
+    async def updateStealCountByUid(
+        self, uid: str, stealTime: str, stealCount: int
+    ) -> bool:
+        """根据用户Uid更新剩余偷菜次数
 
         Args:
             uid (str): 用户Uid
+            stealTime (str): 偷菜日期
+            stealCount (int): 新剩余偷菜次数
 
         Returns:
-            int: 解锁土地数量，失败返回-1
+            bool: 是否更新成功
         """
-        if not uid:
-            return -1
+        if not uid or stealCount < 0:
+            return False
 
-        records = await self.select("user", where={"uid": uid}, columns=["soil"])
-
-        if not records:
-            return -1
-
-        try:
-            soil = int(records[0].get("soil", 3))
-        except Exception:
-            soil = 3
-
-        return soil
+        return await self.update(
+            "user", {"stealTime": stealTime, "stealCount": stealCount}, {"uid": uid}
+        )
 
     async def updateFieldByUid(self, uid: str, field: str, value) -> bool:
         """更新单字段信息

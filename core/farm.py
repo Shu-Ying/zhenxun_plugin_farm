@@ -53,10 +53,9 @@ class CFarmManager:
         if not player:
             return g_sTranslation["basic"]["error"]
 
-        p = player.user.get("point", 0)
-        await player.addPoint("point", point + p)
+        await player.addPoint("point", int(point))
 
-        return f"充值{point}农场币成功，手续费{tax}金币，当前农场币：{point + p}"
+        return f"充值{point}农场币成功，手续费{tax}金币，当前农场币：{player.user.get('point', 0)}"
 
     @classmethod
     async def drawFarmByUid(cls, uid: str) -> bytes:
@@ -869,7 +868,7 @@ class CFarmManager:
             return g_sTranslation["stealing"]["max"]
 
         # 获取用户解锁地块数量
-        soilNumber = await g_pDBService.user.getUserSoilByUid(target)
+        soilNumber = player.user.get("soil", 3)
         harvestRecords: list[str] = []
         isStealingNumber = 0
         isStealingPlant = 0
@@ -974,7 +973,7 @@ class CFarmManager:
         else:
             stealCount -= 1
 
-            await g_pDBService.user.updateStealCountByUid(uid, stealTime, stealCount)
+            await player.updateStealCountByUid(uid, stealTime, stealCount)
 
             return "\n".join(harvestRecords)
 
@@ -988,14 +987,16 @@ class CFarmManager:
         Returns:
             str: 返回条件文本信息
         """
-        userInfo = await g_pDBService.user.getUserInfoByUid(uid)
         rec = g_pJsonManager.m_pLevel["reclamation"]
+        player = await g_pToolManager.getPlayerByUid(uid)
+        if not player:
+            return g_sTranslation["basic"]["error"]
 
         try:
-            if userInfo["soil"] >= 30:
+            if player.user["soil"] >= 30:
                 return g_sTranslation["reclamation"]["perfect"]
 
-            rec = rec[f"{userInfo['soil'] + 1}"]
+            rec = rec[f"{player.user['soil'] + 1}"]
 
             level = rec["level"]
             point = rec["point"]
@@ -1025,16 +1026,18 @@ class CFarmManager:
         Returns:
             str: _description_
         """
-        userInfo = await g_pDBService.user.getUserInfoByUid(uid)
-        level = await g_pDBService.user.getUserLevelByUid(uid)
+        player = await g_pToolManager.getPlayerByUid(uid)
+        if not player:
+            return g_sTranslation["basic"]["error"]
+        level = await player.getUserLevel()
 
         rec = g_pJsonManager.m_pLevel["reclamation"]
 
         try:
-            if userInfo["soil"] >= 30:
+            if player.user["soil"] >= 30:
                 return g_sTranslation["reclamation"]["perfect"]
 
-            rec = rec[f"{userInfo['soil'] + 1}"]
+            rec = rec[f"{player.user['soil'] + 1}"]
 
             levelFileter = rec["level"]
             point = rec["point"]
@@ -1045,12 +1048,12 @@ class CFarmManager:
                     level=level[0], next=levelFileter
                 )
 
-            if userInfo["point"] < point:
+            if player.user["point"] < point:
                 return g_sTranslation["reclamation"]["noNum"].format(num=point)
 
             # TODO 缺少判断消耗的item
-            await g_pDBService.user.updateUserPointByUid(uid, userInfo["point"] - point)
-            await g_pDBService.user.updateUserSoilByUid(uid, userInfo["soil"] + 1)
+            await player.subPoint("point", point)
+            await player.updateField("soil", player.user["soil"] + 1)
 
             return g_sTranslation["reclamation"]["success"]
         except Exception:
@@ -1116,9 +1119,11 @@ class CFarmManager:
         Returns:
             str:
         """
-        userInfo = await g_pDBService.user.getUserInfoByUid(uid)
-        soilInfo = await g_pDBService.userSoil.getUserSoil(uid, soilIndex)
+        player = await g_pToolManager.getPlayerByUid(uid)
+        if not player:
+            return g_sTranslation["basic"]["error"]
 
+        soilInfo = await g_pDBService.userSoil.getUserSoil(uid, soilIndex)
         if not soilInfo:
             return g_sTranslation["soilInfo"]["error"]
 
@@ -1132,9 +1137,9 @@ class CFarmManager:
         fileter = g_pJsonManager.m_pSoil["upgrade"][soilLevelText][countSoil]
 
         getters = {
-            "level": (await g_pDBService.user.getUserLevelByUid(uid))[0],
-            "point": userInfo.get("point", 0),
-            "vipPoint": userInfo.get("vipPoint", 0),
+            "level": (await player.getUserLevel())[0],
+            "point": player.user.get("point", 0),
+            "vipPoint": player.user.get("vipPoint", 0),
         }
 
         requirements = {
@@ -1159,11 +1164,8 @@ class CFarmManager:
         await g_pDBService.userSoil.matureNow(uid, soilIndex)
 
         # 更新数据库字段
-        point = userInfo.get("point", 0) - fileter.get("point", 0)
-        await g_pDBService.user.updateUserPointByUid(uid, point)
-
-        vipPoint = userInfo.get("vipPoint", 0) - fileter.get("vipPoint", 0)
-        await g_pDBService.user.updateUserVipPointByUid(uid, vipPoint)
+        await player.subPoint("point", fileter.get("point", 0))
+        await player.subPoint("vipPoint", fileter.get("vipPoint", 0))
 
         return g_sTranslation["soilInfo"]["success"].format(
             name=await g_pDBService.userSoil.getSoilLevelText(soilLevel),
@@ -1173,21 +1175,21 @@ class CFarmManager:
     @classmethod
     async def pointToVipPointByUid(cls, uid: str, num: int) -> str:
         """点券兑换
-        num:用户传参,即将兑换的点券
-        pro:兑换倍数;兑换倍数乘以num即为需要消耗的农场币
+
         Args:
             uid (str): 用户Uid
             num (int): 兑换点券数量
+
         Returns:
             str: 返回结果
-        兑换比例在配置文件中配置
-        目前配置文件中默认是20倍
-        100点券需要20000农场币
-        赠送点券规则：
-        小于2000点券：0
-        2000-5000点券：100
-        5000-50000点券：280
-        大于50000点券：3000
+            兑换比例在配置文件中配置
+            目前配置文件中默认是20倍
+            100点券需要20000农场币
+            赠送点券规则：
+            小于2000点券：0
+            2000-5000点券：100
+            5000-50000点券：280
+            大于50000点券：3000
         """
         if num < 100:
             return "点券兑换数量必须大于等于100"
@@ -1195,11 +1197,13 @@ class CFarmManager:
         pro = int(Config.get_config("zhenxun_plugin_farm", "点券兑换倍数"))
         pro *= num
 
-        point = await g_pDBService.user.getUserPointByUid(uid)
+        player = await g_pToolManager.getPlayerByUid(uid)
+        if not player:
+            return g_sTranslation["basic"]["error"]
+
+        point = player.user.get("point", 0)
         if point < pro:
             return f"你的农场币不足，当前农场币为{point}，兑换还需要{pro - point}农场币"
-
-        p = await g_pDBService.user.getUserVipPointByUid(uid)
 
         giftPoints: int
         if num < 2000:
@@ -1211,11 +1215,9 @@ class CFarmManager:
         else:
             giftPoints = 3000
 
-        number = num + p + giftPoints
-        await g_pDBService.user.updateUserVipPointByUid(uid, int(number))
-
-        point -= pro
-        await g_pDBService.user.updateUserPointByUid(uid, int(point))
+        number = num + giftPoints
+        await player.addPoint("vipPoint", number)
+        await player.subPoint("point", pro)
 
         return f"兑换{num}点券成功，当前点券：{number}，赠送点券：{giftPoints}，当前农场币：{point}"
 

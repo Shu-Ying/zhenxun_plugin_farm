@@ -762,8 +762,10 @@ diuse_farm.shortcut(
 @diuse_farm.assign("vipSeed-shop")
 async def _(session: Uninfo, res: Match[tuple[str, ...]]):
     uid = str(session.user.id)
+    player = await g_pToolManager.getPlayerByUid(uid)
 
-    if not await g_pToolManager.isRegisteredByUid(uid):
+    if player is None or await player.isRegistered():
+        await g_pToolManager.repeat()
         return
 
     if res.result is inspect._empty:

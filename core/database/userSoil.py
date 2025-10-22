@@ -2,9 +2,9 @@ import math
 
 from zhenxun.services.log import logger
 
+from ...utils.config import g_bIsDebug
+from ...utils.tool import g_pToolManager
 from ..dbService import g_pDBService
-from ..utils.config import g_bIsDebug
-from ..utils.tool import g_pToolManager
 from .database import CSqlManager
 
 
@@ -116,56 +116,6 @@ class CUserSoilDB(CSqlManager):
             return {}
         columns = [description[0] for description in cursor.description]
         return dict(zip(columns, row))
-
-    @classmethod
-    async def migrateOldFarmData(cls) -> bool:
-        """迁移旧土地数据到新表 userSoil 并删除旧表
-
-        Returns:
-            bool: 如果旧表不存在则返回 False，否则迁移并删除后返回 True
-        """
-        # 检查旧表是否存在
-        cursor = await cls.m_pDB.execute(
-            "SELECT name FROM sqlite_master WHERE type='table' AND name='soil'"
-        )
-        if not await cursor.fetchone():
-            return False
-
-        async with cls._transaction():
-            users = await g_pDBService.user.getAllUsers()
-
-            for uid in users:
-                farmInfo = await cls.getUserFarmByUid(uid)
-                for i in range(1, 31):
-                    key = f"soil{i}"
-                    data = farmInfo.get(key)
-                    if not data:
-                        continue
-
-                    if data == ",,,4,":
-                        continue
-
-                    parts = data.split(",")
-                    if len(parts) < 3:
-                        continue
-
-                    name = parts[0]
-                    pt = int(parts[1])
-                    mt = int(parts[2])
-
-                    await cls.m_pDB.execute(
-                        """
-                        INSERT INTO userSoil
-                        (uid,soilIndex,plantName,plantTime,matureTime,harvestCount)
-                        VALUES (?,?,?,?,?,?)
-                        """,
-                        (uid, i, name, pt, mt, 0),
-                    )
-
-            await cls.m_pDB.execute("DROP TABLE soil")
-
-        logger.info("数据库迁移完毕！")
-        return True
 
     @classmethod
     async def insertUserSoil(cls, soilInfo: dict):

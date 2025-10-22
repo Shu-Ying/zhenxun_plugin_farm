@@ -33,9 +33,6 @@ class CDBService:
         self.userSign = CUserSignDB()
         await self.userSign.initDB()
 
-        # 迁移旧数据库
-        await self.userSoil.migrateOldFarmData()
-
     async def cleanup(self):
         await self.plant.cleanup()
 
