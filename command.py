@@ -44,9 +44,10 @@ diuse_register = on_alconna(
 async def handle_register(session: Uninfo):
     uid = str(session.user.id)
     player = await g_pToolManager.getPlayerByUid(uid)
-
-    if player is None or await player.isRegistered():
-        await g_pToolManager.repeat()
+    if player is not None and await player.isRegistered():
+        await MessageUtils.build_message(g_sTranslation["register"]["already"]).send(
+            reply_to=True
+        )
         return
 
     try:
@@ -108,8 +109,7 @@ diuse_farm = on_alconna(
 async def _(session: Uninfo):
     uid = str(session.user.id)
     player = await g_pToolManager.getPlayerByUid(uid)
-
-    if player is None or await player.isRegistered():
+    if player is None or not await player.isRegistered():
         await g_pToolManager.repeat()
         return
 
@@ -129,8 +129,7 @@ diuse_farm.shortcut(
 async def _(session: Uninfo):
     uid = str(session.user.id)
     player = await g_pToolManager.getPlayerByUid(uid)
-
-    if player is None or await player.isRegistered():
+    if player is None or not await player.isRegistered():
         await g_pToolManager.repeat()
         return
 
@@ -153,8 +152,7 @@ diuse_farm.shortcut(
 async def _(session: Uninfo):
     uid = str(session.user.id)
     player = await g_pToolManager.getPlayerByUid(uid)
-
-    if player is None or await player.isRegistered():
+    if player is None or not await player.isRegistered():
         await g_pToolManager.repeat()
         return
 
@@ -182,7 +180,7 @@ async def _(session: Uninfo, res: Match[tuple[str, ...]]):
     uid = str(session.user.id)
     player = await g_pToolManager.getPlayerByUid(uid)
 
-    if player is None or await player.isRegistered():
+    if player is None or not await player.isRegistered():
         await g_pToolManager.repeat()
         return
 
@@ -236,8 +234,7 @@ async def _(
 
     uid = str(session.user.id)
     player = await g_pToolManager.getPlayerByUid(uid)
-
-    if player is None or await player.isRegistered():
+    if player is None or not await player.isRegistered():
         await g_pToolManager.repeat()
         return
 
@@ -257,8 +254,7 @@ diuse_farm.shortcut(
 async def _(session: Uninfo):
     uid = str(session.user.id)
     player = await g_pToolManager.getPlayerByUid(uid)
-
-    if player is None or await player.isRegistered():
+    if player is None or not await player.isRegistered():
         await g_pToolManager.repeat()
         return
 
@@ -285,8 +281,7 @@ async def _(
 
     uid = str(session.user.id)
     player = await g_pToolManager.getPlayerByUid(uid)
-
-    if player is None or await player.isRegistered():
+    if player is None or not await player.isRegistered():
         await g_pToolManager.repeat()
         return
 
@@ -306,8 +301,7 @@ diuse_farm.shortcut(
 async def _(session: Uninfo):
     uid = str(session.user.id)
     player = await g_pToolManager.getPlayerByUid(uid)
-
-    if player is None or await player.isRegistered():
+    if player is None or not await player.isRegistered():
         await g_pToolManager.repeat()
         return
 
@@ -327,8 +321,7 @@ diuse_farm.shortcut(
 async def _(session: Uninfo):
     uid = str(session.user.id)
     player = await g_pToolManager.getPlayerByUid(uid)
-
-    if player is None or await player.isRegistered():
+    if player is None or not await player.isRegistered():
         await g_pToolManager.repeat()
         return
 
@@ -348,8 +341,7 @@ diuse_farm.shortcut(
 async def _(session: Uninfo):
     uid = str(session.user.id)
     player = await g_pToolManager.getPlayerByUid(uid)
-
-    if player is None or await player.isRegistered():
+    if player is None or not await player.isRegistered():
         await g_pToolManager.repeat()
         return
 
@@ -369,8 +361,7 @@ diuse_farm.shortcut(
 async def _(session: Uninfo, name: Match[str]):
     uid = str(session.user.id)
     player = await g_pToolManager.getPlayerByUid(uid)
-
-    if player is None or await player.isRegistered():
+    if player is None or not await player.isRegistered():
         await g_pToolManager.repeat()
         return
 
@@ -390,8 +381,7 @@ diuse_farm.shortcut(
 async def _(session: Uninfo, name: Match[str]):
     uid = str(session.user.id)
     player = await g_pToolManager.getPlayerByUid(uid)
-
-    if player is None or await player.isRegistered():
+    if player is None or not await player.isRegistered():
         await g_pToolManager.repeat()
         return
 
@@ -413,8 +403,7 @@ async def _(
 ):
     uid = str(session.user.id)
     player = await g_pToolManager.getPlayerByUid(uid)
-
-    if player is None or await player.isRegistered():
+    if player is None or not await player.isRegistered():
         await g_pToolManager.repeat()
         return
 
@@ -434,8 +423,7 @@ reclamation = on_alconna(
 async def _(session: Uninfo):
     uid = str(session.user.id)
     player = await g_pToolManager.getPlayerByUid(uid)
-
-    if player is None or await player.isRegistered():
+    if player is None or not await player.isRegistered():
         await g_pToolManager.repeat()
         return
 
@@ -472,8 +460,7 @@ diuse_farm.shortcut(
 async def _(session: Uninfo, target: Match[At]):
     uid = str(session.user.id)
     player = await g_pToolManager.getPlayerByUid(uid)
-
-    if player is None or await player.isRegistered():
+    if player is None or not await player.isRegistered():
         await g_pToolManager.repeat()
         return
 
@@ -512,8 +499,7 @@ async def _(session: Uninfo, num: Query[int] = AlconnaQuery("num", 0)):
 
     uid = str(session.user.id)
     player = await g_pToolManager.getPlayerByUid(uid)
-
-    if player is None or await player.isRegistered():
+    if player is None or not await player.isRegistered():
         await g_pToolManager.repeat()
         return
 
@@ -538,8 +524,7 @@ async def _(session: Uninfo, name: Match[str]):
 
     uid = str(session.user.id)
     player = await g_pToolManager.getPlayerByUid(uid)
-
-    if player is None or await player.isRegistered():
+    if player is None or not await player.isRegistered():
         await g_pToolManager.repeat()
         return
 
@@ -568,8 +553,7 @@ diuse_farm.shortcut(
 async def _(session: Uninfo):
     uid = str(session.user.id)
     player = await g_pToolManager.getPlayerByUid(uid)
-
-    if player is None or await player.isRegistered():
+    if player is None or not await player.isRegistered():
         await g_pToolManager.repeat()
         return
 
@@ -637,8 +621,7 @@ soil_upgrade = on_alconna(
 async def _(session: Uninfo, index: Query[int] = AlconnaQuery("index", 1)):
     uid = str(session.user.id)
     player = await g_pToolManager.getPlayerByUid(uid)
-
-    if player is None or await player.isRegistered():
+    if player is None or not await player.isRegistered():
         await g_pToolManager.repeat()
         return
 
@@ -678,8 +661,7 @@ diuse_farm.shortcut(
 async def _(session: Uninfo, num: Query[int] = AlconnaQuery("num", 0)):
     uid = str(session.user.id)
     player = await g_pToolManager.getPlayerByUid(uid)
-
-    if player is None or await player.isRegistered():
+    if player is None or not await player.isRegistered():
         await g_pToolManager.repeat()
         return
 
@@ -703,8 +685,7 @@ async def _(session: Uninfo, num: Query[int] = AlconnaQuery("num", 0)):
 
     uid = str(session.user.id)
     player = await g_pToolManager.getPlayerByUid(uid)
-
-    if player is None or await player.isRegistered():
+    if player is None or not await player.isRegistered():
         await g_pToolManager.repeat()
         return
 
@@ -724,8 +705,7 @@ diuse_farm.shortcut(
 async def _(session: Uninfo):
     uid = str(session.user.id)
     player = await g_pToolManager.getPlayerByUid(uid)
-
-    if player is None or await player.isRegistered():
+    if player is None or not await player.isRegistered():
         await g_pToolManager.repeat()
         return
 
@@ -763,8 +743,7 @@ diuse_farm.shortcut(
 async def _(session: Uninfo, res: Match[tuple[str, ...]]):
     uid = str(session.user.id)
     player = await g_pToolManager.getPlayerByUid(uid)
-
-    if player is None or await player.isRegistered():
+    if player is None or not await player.isRegistered():
         await g_pToolManager.repeat()
         return
 
