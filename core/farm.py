@@ -629,6 +629,15 @@ class CFarmManager:
                         uid, soilInfo["plantName"], number
                     )
 
+                    # 统计收获次数
+                    try:
+                        await g_pDBService.userPlantCount.addUserPlantCountByUid(
+                            uid, soilInfo["plantName"]
+                        )
+                    except Exception:
+                        # 忽略统计异常，避免影响主流程
+                        pass
+
                     # 如果到达收获次数上限
                     if soilInfo["harvestCount"] + 1 >= plantInfo["crop"]:
                         await g_pDBService.userSoil.updateUserSoil(
@@ -1220,6 +1229,81 @@ class CFarmManager:
         await player.subPoint("point", pro)
 
         return f"兑换{num}点券成功，当前点券：{number}，赠送点券：{giftPoints}，当前农场币：{point}"
+
+    @classmethod
+    async def getUserPlantCountImage(
+        cls, uid: str, filterKey: str | int = 1, num: int = 1
+    ) -> bytes:
+        """获取用户作物收获次数图片
+
+        Args:
+            filterKey (str|int):
+                - 字符串: 根据关键字筛选种子名称
+                - 整数: 翻至对应页（无筛选）
+            num (int, optional): 当 filterKey 为字符串时，用于指定页码。Defaults to 1.
+
+        Returns:
+            bytes: 返回商店图片bytes
+        """
+        # 解析参数：区分筛选关键字和页码
+        filterStr = None
+        if isinstance(filterKey, int):
+            page = filterKey
+        else:
+            filterStr = filterKey
+            page = num
+
+        # 表头定义
+        columnName = [
+            "-",
+            "种子名称",
+            "收获次数",
+        ]
+
+        # 查询用户作物收获次数（返回 dict: {plant: count}）并根据筛选关键字过滤
+        plants = await g_pDBService.userPlantCount.getUserPlantCountByUid(uid) or {}
+        filteredPlants = []
+
+        for name, cnt in plants.items():
+            # 字符串筛选
+            if filterStr and filterStr not in name:
+                continue
+            filteredPlants.append({"plant": name, "count": cnt})
+
+        # 计算分页
+        totalCount = len(filteredPlants)
+        pageCount = math.ceil(totalCount / 15) if totalCount else 1
+        startIndex = (page - 1) * 15
+        pageItems = filteredPlants[startIndex : startIndex + 15]
+
+        # 构建数据行
+        dataList = []
+        for plant in pageItems:
+            # 图标处理
+            icon = ""
+            iconPath = g_sResourcePath / f"plant/{plant['plant']}/icon.png"
+            if iconPath.exists():
+                icon = (iconPath, 33, 33)
+
+            dataList.append(
+                [
+                    icon,
+                    plant["plant"],  # 种子名称
+                    plant["count"],  # 收获次数
+                ]
+            )
+
+        # 页码标题
+        title = f"收获次数 页数: {page}/{pageCount}"
+
+        # 渲染表格并返回图片bytes
+        result = await ImageTemplate.table_page(
+            title,
+            "",
+            columnName,
+            dataList,
+        )
+        return result.pic2bytes()
 
 
 g_pFarmManager = CFarmManager()

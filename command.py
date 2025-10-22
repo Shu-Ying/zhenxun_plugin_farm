@@ -98,6 +98,7 @@ diuse_farm = on_alconna(
         Subcommand("my-vipPoint", help_text="我的点券"),
         Subcommand("farm-help", help_text="农场帮助"),
         Subcommand("vipSeed-shop", Args["res?", MultiVar(str)], help_text="种子商店"),
+        Subcommand("my-plantcount", help_text="我的作物收获次数"),
     ),
     priority=5,
     block=True,
@@ -774,5 +775,52 @@ async def _(session: Uninfo, res: Match[tuple[str, ...]]):
         image = await g_pShopManager.getSeedShopImage(page, 0, 1)
     else:
         image = await g_pShopManager.getSeedShopImage(filterKey, page, 1)
+
+    await MessageUtils.build_message(image).send()
+
+
+diuse_farm.shortcut(
+    "我的收获次数",
+    command="我的农场",
+    arguments=["my-plantcount"],
+    prefix=True,
+)
+
+
+@diuse_farm.assign("my-plantcount")
+async def _(session: Uninfo, res: Match[tuple[str, ...]]):
+    uid = str(session.user.id)
+    player = await g_pToolManager.getPlayerByUid(uid)
+    if player is None or not await player.isRegistered():
+        await g_pToolManager.repeat()
+        return
+
+    if res.result is inspect._empty:
+        raw = []
+    else:
+        raw = res.result
+
+    filterKey: str | int | None = None
+    page: int = 1
+
+    if len(raw) >= 1 and raw[0] is not None:
+        first = raw[0]
+        if isinstance(first, str) and first.isdigit():
+            page = int(first)
+        else:
+            filterKey = first
+
+    if (
+        len(raw) >= 2
+        and raw[1] is not None
+        and isinstance(raw[1], str)
+        and raw[1].isdigit()
+    ):
+        page = int(raw[1])
+
+    if filterKey is None:
+        image = await g_pFarmManager.getUserPlantCountImage(uid, page, 0)
+    else:
+        image = await g_pFarmManager.getUserPlantCountImage(uid, filterKey, page)
 
     await MessageUtils.build_message(image).send()

@@ -41,6 +41,7 @@ g_sTranslation = {
         "success": "✅ 农场开通成功！\n💼 初始资金：{point}农场币 🥳🎉",
         "repeat": "🎉 您已经开通农场啦~ 😄",
         "error": "⚠️ 开通失败，请稍后再试 💔",
+        "already": "🚜 你已经开通农场啦~ 快去种田吧 🌱",
     },
     "buySeed": {
         "notSeed": "🌱 请在指令后跟需要购买的种子名称",
