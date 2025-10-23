@@ -121,7 +121,7 @@ class CUserSignDB(CSqlManager):
             signDate (str): 日期字符串 'YYYY-MM-DD' 不传默认当前系统日期
 
         Returns:
-            bool: 0: 签到失败 1: 签到成功 2: 重复签到
+            int: 0: 签到失败 1: 签到成功 2: 重复签到
         """
         try:
             player = await g_pToolManager.getPlayerByUid(uid)
@@ -136,9 +136,10 @@ class CUserSignDB(CSqlManager):
 
             todayStr = g_pToolManager.dateTime().date().today().strftime("%Y-%m-%d")
             isSupplement = 0 if signDate == todayStr else 1
+            sign = await g_pJsonManager.getSign()
 
             expMax, expMin, pointMax, pointMin = [
-                g_pJsonManager.m_pSign.get(key, default)
+                sign.get(key, default)
                 for key, default in (
                     ("exp_max", 50),
                     ("exp_min", 5),
@@ -169,13 +170,14 @@ class CUserSignDB(CSqlManager):
                         if row["currentMonth"] == currentMonth
                         else 1
                     )
-                    lastDate = row["lastSignDate"]
                     prevDate = (
                         g_pToolManager.dateTime().strptime(signDate, "%Y-%m-%d")
                         - timedelta(days=1)
                     ).strftime("%Y-%m-%d")
                     continuousDays = (
-                        row["continuousDays"] + 1 if lastDate == prevDate else 1
+                        row["continuousDays"] + 1
+                        if row["lastSignDate"] == prevDate
+                        else 1
                     )
                     supplementCount = (
                         row["supplementCount"] + 1
@@ -222,7 +224,7 @@ class CUserSignDB(CSqlManager):
                     )
 
             # 计算累签奖励
-            reward = g_pJsonManager.m_pSign["continuou"].get(f"{monthSignDays}", None)
+            reward = sign["continuou"].get(f"{monthSignDays}", None)
             if reward:
                 point += reward.get("point", 0)
                 exp += reward.get("exp", 0)

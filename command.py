@@ -24,11 +24,11 @@ from zhenxun.services.log import logger
 from zhenxun.utils._build_image import BuildImage
 from zhenxun.utils.message import MessageUtils
 
+from .core.activity.sign_in import g_pSignInManager
 from .core.dbService import g_pDBService
 from .core.farm import g_pFarmManager
 from .core.shop import g_pShopManager
 from .utils.config import g_bSignStatus, g_sTranslation
-from .utils.json import g_pJsonManager
 from .utils.tool import g_pToolManager
 
 diuse_register = on_alconna(
@@ -45,7 +45,7 @@ async def handle_register(session: Uninfo):
     uid = str(session.user.id)
     player = await g_pToolManager.getPlayerByUid(uid)
     if player is not None and await player.isRegistered():
-        await MessageUtils.build_message(g_sTranslation["register"]["already"]).send(
+        await MessageUtils.build_message(g_sTranslation["register"]["repeat"]).send(
             reply_to=True
         )
         return
@@ -560,52 +560,9 @@ async def _(session: Uninfo):
     # 判断签到是否正常加载
     if not g_bSignStatus:
         await MessageUtils.build_message(g_sTranslation["signIn"]["error"]).send()
-
         return
 
-    toDay = g_pToolManager.dateTime().date().today()
-    message = ""
-    status = await g_pDBService.userSign.sign(uid, toDay.strftime("%Y-%m-%d"))
-
-    # 如果完成签到
-    if status == 1 or status == 2:
-        # 获取签到总天数
-        signDay = await g_pDBService.userSign.getUserSignCountByDate(
-            uid, toDay.strftime("%Y-%m")
-        )
-        exp, point = await g_pDBService.userSign.getUserSignRewardByDate(
-            uid, toDay.strftime("%Y-%m-%d")
-        )
-
-        message += g_sTranslation["signIn"]["success"].format(
-            day=signDay, exp=exp, num=point
-        )
-
-        reward = g_pJsonManager.m_pSign["continuou"].get(f"{signDay}", None)
-
-        if reward:
-            extraPoint = reward.get("point", 0)
-            extraExp = reward.get("exp", 0)
-
-            plant = reward.get("plant", {})
-
-            message += g_sTranslation["signIn"]["grandTotal"].format(
-                exp=extraExp, num=extraPoint
-            )
-
-            vipPoint = reward.get("vipPoint", 0)
-
-            if vipPoint > 0:
-                message += g_sTranslation["signIn"]["grandTotal1"].format(num=vipPoint)
-
-            if plant:
-                for key, value in plant.items():
-                    message += g_sTranslation["signIn"]["grandTotal2"].format(
-                        name=key, num=value
-                    )
-    else:
-        message = g_sTranslation["signIn"]["error1"]
-
+    message = await g_pSignInManager.signInByUid(uid)
     await MessageUtils.build_message(message).send()
 
 

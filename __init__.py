@@ -7,6 +7,7 @@ from zhenxun.services.log import logger
 from zhenxun.utils.message import MessageUtils
 
 from .command import diuse_farm, diuse_register, reclamation
+from .core.activity.sign_in import g_pSignInManager
 from .core.database.database import g_pSqlManager
 from .core.dbService import g_pDBService
 from .core.farm import g_pFarmManager
@@ -14,6 +15,7 @@ from .core.help import g_pHelpManager
 from .core.player.playerPool import g_pUserPool
 from .core.shop import g_pShopManager
 from .event.event import g_pEventManager
+from .utils.config import g_sResourcePath, g_sTranslation
 from .utils.json import g_pJsonManager
 from .utils.request import g_pRequestManager
 
@@ -55,6 +57,12 @@ __plugin_meta__ = PluginMetadata(
                 default_value="low",
             ),
             RegisterConfig(
+                key="签到图片样式",
+                value="text",
+                help="签到图片的样式, [text, html]",
+                default_value="text",
+            ),
+            RegisterConfig(
                 key="兑换倍数",
                 value="2",
                 help="金币兑换农场币的倍数 默认值为: 2倍",
@@ -90,9 +98,6 @@ async def start():
     # 数据库加载
     await g_pSqlManager.init()
 
-    # 初始化读取Json
-    await g_pJsonManager.init()
-
     # 初始化数据库变量 和 加载作物数据库
     await g_pDBService.init()
 
@@ -100,6 +105,28 @@ async def start():
     await g_pRequestManager.initPlantDBFile()
 
     await g_pHelpManager.createHelpImage()
+
+    # todayRewards = [
+    #     {
+    #         "imagePath": "../plant/ATTomato/icon.png",
+    #         "name": "金币",
+    #         "quantity": 100,
+    #     },
+    # ]
+
+    # logger.info(f"{todayRewards[0]}")
+
+    # cumulativeRewards = [
+    #     {
+    #         "imagePath": g_sResourcePath / "/plant/ATTomato/icon.png",
+    #         "name": "金币",
+    #         "quantity": 200,
+    #         "description": "累计签到1次",
+    #         "achieved": True,
+    #     },
+    # ]
+
+    # await g_pSignInManager.createSignImage(todayRewards, cumulativeRewards, 1, 1, 1)
 
 
 # 析构函数

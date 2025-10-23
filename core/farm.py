@@ -69,12 +69,13 @@ class CFarmManager:
         """
         img = BuildImage(background=g_sResourcePath / "background/background.jpg")
 
-        soilSize = g_pJsonManager.m_pSoil["size"]
+        soil = await g_pJsonManager.getSoil()
+        soilSize = soil["size"]
+        soilPos = soil["soil"]
 
         grass = BuildImage(background=g_sResourcePath / "soil/草土地.png")
         await grass.resize(0, soilSize[0], soilSize[1])
 
-        soilPos = g_pJsonManager.m_pSoil["soil"]
         player = await g_pToolManager.getPlayerByUid(uid)
         if not player:
             return img.pic2bytes()
@@ -987,7 +988,8 @@ class CFarmManager:
         Returns:
             str: 返回条件文本信息
         """
-        rec = g_pJsonManager.m_pLevel["reclamation"]
+        jLevel = await g_pJsonManager.getLevel()
+        rec = jLevel["reclamation"]
         player = await g_pToolManager.getPlayerByUid(uid)
         if not player:
             return g_sTranslation["basic"]["error"]
@@ -1031,7 +1033,8 @@ class CFarmManager:
             return g_sTranslation["basic"]["error"]
         level = await player.getUserLevel()
 
-        rec = g_pJsonManager.m_pLevel["reclamation"]
+        jsonLevel = await g_pJsonManager.getLevel()
+        rec = jsonLevel["reclamation"]
 
         try:
             if player.user["soil"] >= 30:
@@ -1084,7 +1087,8 @@ class CFarmManager:
 
         # 获取升级所需
         soilLevelText = await g_pDBService.userSoil.getSoilLevel(soilLevel)
-        fileter = g_pJsonManager.m_pSoil["upgrade"][soilLevelText][countSoil]
+        jSoil = await g_pJsonManager.getSoil()
+        fileter = jSoil["upgrade"][soilLevelText][countSoil]
 
         nextLevel = await g_pDBService.userSoil.getSoilLevelText(soilLevel)
 
@@ -1134,7 +1138,8 @@ class CFarmManager:
         countSoil = await g_pDBService.userSoil.countSoilByLevel(uid, soilLevel)
 
         soilLevelText = await g_pDBService.userSoil.getSoilLevel(soilLevel)
-        fileter = g_pJsonManager.m_pSoil["upgrade"][soilLevelText][countSoil]
+        soil = await g_pJsonManager.getSoil()
+        fileter = soil["upgrade"][soilLevelText][countSoil]
 
         getters = {
             "level": (await player.getUserLevel())[0],
