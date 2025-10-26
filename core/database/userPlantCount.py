@@ -76,6 +76,24 @@ class CUserPlantCountDB(CSqlManager):
         return {row["plant"]: row["count"] for row in rows}
 
     @classmethod
+    async def getUserPlantCountByPlantName(cls, uid: str, plant: str) -> int:
+        """根据用户Uid和植物名称获取该对应的收获次数
+
+        Args:
+            uid (str): 用户uid
+            plant (str): 植物名称
+
+        Returns:
+            int: 收获次数
+        """
+        cursor = await cls.m_pDB.execute(
+            "SELECT count FROM userPlantCount WHERE uid = ? AND plant = ?",
+            (uid, plant),
+        )
+        row = await cursor.fetchone()
+        return row["count"] if row else 0
+
+    @classmethod
     async def updateUserPlantCountByName(cls, uid: str, plant: str, count: int) -> bool:
         """根据植物名称更新植物的收获次数
 
