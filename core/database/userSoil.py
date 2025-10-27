@@ -37,7 +37,7 @@ class CUserSoilDB(CSqlManager):
         Args:
             soilIndex (int): 地块索引 从1开始
         """
-        if not g_bIsDebug:
+        if g_bIsDebug:
             return
 
         soilInfo = await cls.getUserSoil(uid, soilIndex)

@@ -631,8 +631,15 @@ class CFarmManager:
 
                     # 统计收获次数
                     try:
+                        # 统一处理星级植物名称
+                        plant_name = soilInfo["plantName"]
+
+                        # 简单判断是否包含"星"，如果包含则分割取后半部分
+                        if "星" in plant_name:
+                            plant_name = plant_name.split("星", 1)[-1]
+
                         await g_pDBService.userPlantCount.addUserPlantCountByUid(
-                            uid, soilInfo["plantName"]
+                            uid, plant_name
                         )
                     except Exception:
                         # 忽略统计异常，避免影响主流程
