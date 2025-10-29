@@ -384,7 +384,7 @@ class CUserSoilDB(CSqlManager):
         if soilInfo and soilInfo.get("plantName"):
             return False
 
-        # 获取植物配置
+        # 获取植物配置"""  """
         plantCfg = await g_pDBService.plant.getPlantByName(plantName)
         if not plantCfg:
             logger.error(f"未知植物: {plantName}")
@@ -404,6 +404,20 @@ class CUserSoilDB(CSqlManager):
             async with cls._transaction():
                 prev = soilInfo or {}
                 await cls._deleteUserSoil(uid, soilIndex)
+                # 根据此植物收获次数对其星级进行升级
+                if g_pDBService.plant.existsPlant("一星" + plantName):
+                    harvestCounts = (
+                        await g_pDBService.userPlantCount.getUserPlantCountByPlantName(
+                            uid, plantName
+                        )
+                    )
+                    if harvestCounts >= 350:
+                        plantName = "一星" + plantName
+                    if harvestCounts >= 700:
+                        plantName = "二星" + plantName
+                    if harvestCounts >= 1200:
+                        plantName = "三星" + plantName
+
                 await cls._insertUserSoil(
                     {
                         "uid": uid,
