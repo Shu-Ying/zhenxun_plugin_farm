@@ -1,4 +1,5 @@
 import math
+import re
 
 from zhenxun.services.log import logger
 
@@ -405,18 +406,29 @@ class CUserSoilDB(CSqlManager):
                 prev = soilInfo or {}
                 await cls._deleteUserSoil(uid, soilIndex)
                 # 根据此植物收获次数对其星级进行升级
-                if g_pDBService.plant.existsPlant("一星" + plantName):
+                # 为避免对已带星级前缀的作物重复添加前缀，先提取基础名称
+                base_name = plantName
+                m = re.match(r"^(?:一星|二星|三星|四星|五星)", plantName)
+                if m:
+                    base_name = plantName[len(m.group(0)) :]
+
+                # 只有当存在一星升级配置时才尝试按收获次数升级
+                if await g_pDBService.plant.existsPlant("一星" + base_name):
                     harvestCounts = (
                         await g_pDBService.userPlantCount.getUserPlantCountByPlantName(
-                            uid, plantName
+                            uid, base_name
                         )
                     )
-                    if harvestCounts >= 350:
-                        plantName = "一星" + plantName
-                    if harvestCounts >= 700:
-                        plantName = "二星" + plantName
+                    # 根据阈值设定最高星级（避免重复拼接）
+                    prefix = ""
                     if harvestCounts >= 1200:
-                        plantName = "三星" + plantName
+                        prefix = "三星"
+                    elif harvestCounts >= 700:
+                        prefix = "二星"
+                    elif harvestCounts >= 350:
+                        prefix = "一星"
+
+                    plantName = prefix + base_name if prefix else base_name
 
                 await cls._insertUserSoil(
                     {
