@@ -1,5 +1,6 @@
 import math
 import random
+import re
 
 from zhenxun.configs.config import Config
 from zhenxun.models.user_console import UserConsole
@@ -629,6 +630,21 @@ class CFarmManager:
                     await g_pDBService.userPlant.addUserPlantByUid(
                         uid, soilInfo["plantName"], number
                     )
+
+                    # 统计收获次数
+                    try:
+                        # 处理星级前缀（只在前两字为 一星/二星/三星/四星/五星 时去掉前缀）
+                        plant_name = soilInfo["plantName"]
+                        m = re.match(r"^(?:一星|二星|三星|四星|五星)", plant_name)
+                        if m:
+                            plant_name = plant_name[len(m.group(0)) :]
+
+                        await g_pDBService.userPlantCount.addUserPlantCountByUid(
+                            uid, plant_name
+                        )
+                    except Exception:
+                        # 忽略统计异常，避免影响主流程
+                        pass
 
                     # 如果到达收获次数上限
                     if soilInfo["harvestCount"] + 1 >= plantInfo["crop"]:

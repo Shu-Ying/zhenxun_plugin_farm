@@ -4,6 +4,7 @@ class CDBService:
         from .database.user import CUserDB
         from .database.userItem import CUserItemDB
         from .database.userPlant import CUserPlantDB
+        from .database.userPlantCount import CUserPlantCountDB
         from .database.userSeed import CUserSeedDB
         from .database.userSign import CUserSignDB
         from .database.userSoil import CUserSoilDB
@@ -32,6 +33,9 @@ class CDBService:
 
         self.userSign = CUserSignDB()
         await self.userSign.initDB()
+
+        self.userPlantCount = CUserPlantCountDB()
+        await self.userPlantCount.initDB()
 
     async def cleanup(self):
         await self.plant.cleanup()
