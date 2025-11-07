@@ -1,5 +1,6 @@
 import math
 import random
+import re
 
 from zhenxun.configs.config import Config
 from zhenxun.models.user_console import UserConsole
@@ -631,12 +632,11 @@ class CFarmManager:
 
                     # 统计收获次数
                     try:
-                        # 统一处理星级植物名称
+                        # 处理星级前缀（只在前两字为 一星/二星/三星/四星/五星 时去掉前缀）
                         plant_name = soilInfo["plantName"]
-
-                        # 简单判断是否包含"星"，如果包含则分割取后半部分
-                        if "星" in plant_name:
-                            plant_name = plant_name.split("星", 1)[-1]
+                        m = re.match(r"^(?:一星|二星|三星|四星|五星)", plant_name)
+                        if m:
+                            plant_name = plant_name[len(m.group(0)) :]
 
                         await g_pDBService.userPlantCount.addUserPlantCountByUid(
                             uid, plant_name
