@@ -2,9 +2,8 @@ import math
 
 from zhenxun.utils.image_utils import ImageTemplate
 
-from ..core.dbService import g_pDBService
-from ..utils.config import g_sResourcePath, g_sTranslation
-from ..utils.tool import g_pToolManager
+from ..utils import config, getToolManager
+from . import g_pDBlocator
 
 
 class CShopManager:
@@ -46,7 +45,7 @@ class CShopManager:
         ]
 
         # 查询所有可购买作物，并根据筛选关键字过滤
-        plants = await g_pDBService.plant.listPlants()
+        plants = await g_pDBlocator.getPlantManager().listPlants()
         filteredPlants = []
 
         # 如果是点券商店
@@ -87,7 +86,7 @@ class CShopManager:
         for plant in pageItems:
             # 图标处理
             icon = ""
-            iconPath = g_sResourcePath / f"plant/{plant['name']}/icon.png"
+            iconPath = config.g_sResourcePath / f"plant/{plant['name']}/icon.png"
             if iconPath.exists():
                 icon = (iconPath, 33, 33)
 
@@ -136,17 +135,17 @@ class CShopManager:
             str:
         """
         if num <= 0:
-            return g_sTranslation["buySeed"]["notNum"]
+            return config.g_sTranslation["buySeed"]["notNum"]
 
-        player = await g_pToolManager.getPlayerByUid(uid)
-        plantInfo = await g_pDBService.plant.getPlantByName(name)
+        player = await getToolManager().getPlayerByUid(uid)
+        plantInfo = await g_pDBlocator.getPlantManager().getPlantByName(name)
         if not plantInfo or not player:
-            return g_sTranslation["buySeed"]["error"]
+            return config.g_sTranslation["buySeed"]["error"]
 
         level = player.user.get("level", 0)
 
         if level < int(plantInfo["level"]):
-            return g_sTranslation["buySeed"]["noLevel"]
+            return config.g_sTranslation["buySeed"]["noLevel"]
 
         vipSeed = plantInfo.get("isVip", 0) == 1
         currencyType = "vipPoint" if vipSeed else "point"
@@ -155,17 +154,19 @@ class CShopManager:
 
         currentCurrency = player.user.get(currencyType, 0)
         if currentCurrency < totalCost:
-            return g_sTranslation["buySeed"][f"no{'Vip' if vipSeed else ''}Point"]
+            return config.g_sTranslation["buySeed"][
+                f"no{'Vip' if vipSeed else ''}Point"
+            ]
 
-        await player.addPoint(currencyType, currentCurrency - totalCost)
+        await player.subPoint(currencyType, totalCost)
 
-        if not await g_pDBService.userSeed.addUserSeedByUid(uid, name, num):
-            return g_sTranslation["buySeed"]["errorSql"]
+        if not await g_pDBlocator.getUserSeedManager().addUserSeedByUid(uid, name, num):
+            return config.g_sTranslation["buySeed"]["errorSql"]
 
         success_key = "vipSuccess" if vipSeed else "success"
         remaining_currency = currentCurrency - totalCost
 
-        return g_sTranslation["buySeed"][success_key].format(
+        return config.g_sTranslation["buySeed"][success_key].format(
             name=name, total=totalCost, point=remaining_currency
         )
 
@@ -182,9 +183,9 @@ class CShopManager:
         if not isinstance(name, str) or name.strip() == "":
             name = ""
 
-        plant = await g_pDBService.userPlant.getUserPlantByUid(uid)
+        plant = await g_pDBlocator.getUserPlantManager().getUserPlantByUid(uid)
         if not plant:
-            return g_sTranslation["sellPlant"]["no"]
+            return config.g_sTranslation["sellPlant"]["no"]
 
         point = 0
         totalSold = 0
@@ -192,27 +193,31 @@ class CShopManager:
 
         if name == "":
             for plantName, count in plant.items():
-                isLock = await g_pDBService.userPlant.checkPlantLockByName(
+                isLock = await g_pDBlocator.getUserPlantManager().checkPlantLockByName(
                     uid, plantName
                 )
 
                 if isLock:
                     continue
 
-                plantInfo = await g_pDBService.plant.getPlantByName(plantName)
+                plantInfo = await g_pDBlocator.getUserPlantManager().getPlantByName(
+                    plantName
+                )
                 if not plantInfo:
                     continue
 
                 point += plantInfo["price"] * count
-                await g_pDBService.userPlant.updateUserPlantByName(uid, plantName, 0)
+                await g_pDBlocator.getUserPlantManager().updateUserPlantByName(
+                    uid, plantName, 0
+                )
         else:
             if name not in plant:
-                return g_sTranslation["sellPlant"]["error"].format(name=name)
+                return config.g_sTranslation["sellPlant"]["error"].format(name=name)
             available = plant[name]
             sellAmount = available if isAll else min(available, num)
             if sellAmount <= 0:
-                return g_sTranslation["sellPlant"]["error1"].format(name=name)
-            await g_pDBService.userPlant.updateUserPlantByName(
+                return config.g_sTranslation["sellPlant"]["error1"].format(name=name)
+            await g_pDBlocator.getUserPlantManager().updateUserPlantByName(
                 uid, name, available - sellAmount
             )
             totalSold = sellAmount
@@ -220,7 +225,7 @@ class CShopManager:
         if name == "":
             totalPoint = point
         else:
-            plantInfo = await g_pDBService.plant.getPlantByName(name)
+            plantInfo = await g_pDBlocator.getUserPlantManager().getPlantByName(name)
             if not plantInfo:
                 price = 0
             else:
@@ -228,18 +233,15 @@ class CShopManager:
 
             totalPoint = totalSold * price
 
-        player = await g_pToolManager.getPlayerByUid(uid)
+        player = await getToolManager().getPlayerByUid(uid)
         if not player:
-            return g_sTranslation["basic"]["error"]
+            return config.g_sTranslation["basic"]["error"]
 
         currentPoint = player.user.get("point", 0)
         await player.addPoint("point", currentPoint + totalPoint)
 
         result = "success1" if name == "" else "success"
 
-        return g_sTranslation["sellPlant"][result].format(
+        return config.g_sTranslation["sellPlant"][result].format(
             point=totalPoint, num=currentPoint + totalPoint
         )
-
-
-g_pShopManager = CShopManager()

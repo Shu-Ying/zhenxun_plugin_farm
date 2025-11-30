@@ -5,16 +5,12 @@ import re
 from zhenxun.configs.config import Config
 from zhenxun.models.user_console import UserConsole
 from zhenxun.services.log import logger
-from zhenxun.utils._build_image import BuildImage
 from zhenxun.utils.enum import GoldHandle
 from zhenxun.utils.image_utils import ImageTemplate
-from zhenxun.utils.platform import PlatformUtils
 
 from ..core.dbService import g_pDBService
-from ..event.event import g_pEventManager
-from ..utils.config import g_bIsDebug, g_iSoilLevelMax, g_sResourcePath, g_sTranslation
-from ..utils.json import g_pJsonManager
-from ..utils.tool import g_pToolManager
+from ..event import g_pEventManager
+from ..utils import config, getJsonManager, getToolManager
 
 
 class CFarmManager:
@@ -50,371 +46,13 @@ class CFarmManager:
         )
 
         point = num * pro
-        player = await g_pToolManager.getPlayerByUid(uid)
+        player = await getToolManager().getPlayerByUid(uid)
         if not player:
-            return g_sTranslation["basic"]["error"]
+            return config.g_sTranslation["basic"]["error"]
 
         await player.addPoint("point", int(point))
 
         return f"充值{point}农场币成功，手续费{tax}金币，当前农场币：{player.user.get('point', 0)}"
-
-    @classmethod
-    async def drawFarmByUid(cls, uid: str) -> bytes:
-        """绘制用户农场
-
-        Args:
-            uid (str): 用户UID
-
-        Returns:
-            bytes: 返回绘制结果
-        """
-        img = BuildImage(background=g_sResourcePath / "background/background.jpg")
-
-        soil = await g_pJsonManager.getSoil()
-        soilSize = soil["size"]
-        soilPos = soil["soil"]
-
-        grass = BuildImage(background=g_sResourcePath / "soil/草土地.png")
-        await grass.resize(0, soilSize[0], soilSize[1])
-
-        player = await g_pToolManager.getPlayerByUid(uid)
-        if not player:
-            return img.pic2bytes()
-
-        soilUnlock = int(player.user.get("soil", 3))
-
-        x = 0
-        y = 0
-        isFirstExpansion = True  # 首次添加扩建图片
-        isFirstRipe = True
-        plant = None
-        for index in range(0, 30):
-            x = soilPos[str(index + 1)]["x"]
-            y = soilPos[str(index + 1)]["y"]
-
-            # 如果土地已经到达对应等级
-            if index < soilUnlock:
-                soilUrl = ""
-                # TODO 缺少判断用户土地资源状况
-                soilInfo = await g_pDBService.userSoil.getUserSoil(uid, index + 1)
-
-                if not soilInfo:
-                    soilUrl = "soil/普通土地.png"
-                else:
-                    soilLevel = soilInfo.get("soilLevel", 0)
-
-                    if soilLevel == 1:
-                        soilUrl = "soil/红土地.png"
-                    elif soilLevel == 2:
-                        soilUrl = "soil/黑土地.png"
-                    elif soilLevel == 3:
-                        soilUrl = "soil/金土地.png"
-                    else:
-                        soilUrl = "soil/普通土地.png"
-
-                soil = BuildImage(background=g_sResourcePath / soilUrl)
-                await soil.resize(0, soilSize[0], soilSize[1])
-
-                await img.paste(soil, (x, y))
-
-                isPlant, plant, isRipe, offsetX, offsetY = await cls.drawSoilPlant(
-                    uid, index + 1
-                )
-
-                if isPlant:
-                    await img.paste(
-                        plant,
-                        (
-                            x + soilSize[0] // 2 - plant.width // 2 + offsetX,
-                            y + soilSize[1] // 2 - plant.height // 2 + offsetY,
-                        ),
-                    )
-
-                # 1700 275
-                # 首次添加可收获图片
-                if isRipe and isFirstRipe:
-                    ripe = BuildImage(
-                        background=g_sResourcePath / "background/ripe.png"
-                    )
-
-                    await img.paste(
-                        ripe,
-                        (x + soilSize[0] // 2 - ripe.width // 2, y - ripe.height // 2),
-                    )
-
-                    isFirstRipe = False
-            else:
-                await img.paste(grass, (x, y))
-
-                if isFirstExpansion:
-                    isFirstExpansion = False
-
-                    # 首次添加扩建图片
-                    expansion = BuildImage(
-                        background=g_sResourcePath / "background/expansion.png"
-                    )
-                    await expansion.resize(0, 69, 69)
-                    await img.paste(
-                        expansion,
-                        (
-                            x + soilSize[0] // 2 - expansion.width // 2,
-                            y + soilSize[1] // 2 - expansion.height,
-                        ),
-                    )
-
-        # 左上角绘制用户信息
-        # 头像
-        image = await PlatformUtils.get_user_avatar(uid, "qq")
-
-        if image:
-            avatar = BuildImage(background=image)
-
-            await avatar.resize(0, 140, 150)
-            await img.paste(avatar, (125, 85))
-
-        # 头像框
-        frame = BuildImage(background=g_sResourcePath / "background/frame.png")
-        await img.paste(frame, (75, 44))
-
-        # 用户名
-        nameImg = await BuildImage.build_text_image(
-            player.user["name"], size=24, font_color=(77, 35, 4)
-        )
-        await img.paste(nameImg, (300, 92))
-
-        # 经验值
-        level = await player.getUserLevel()
-
-        beginX = 309
-        endX = 627
-        # 绘制宽度计算公式为 (当前经验值 / 经验值上限) * 宽度
-        width = int((level[2] / level[1]) * (endX - beginX))
-        await img.rectangle((beginX, 188, beginX + width, 222), (171, 194, 41))
-
-        expImg = await BuildImage.build_text_image(
-            f"{level[2]} / {level[1]}", size=24, font_color=(102, 120, 19)
-        )
-        await img.paste(expImg, (390, 193))
-
-        # 等级
-        levelImg = await BuildImage.build_text_image(
-            str(level[0]), size=32, font_color=(214, 111, 1)
-        )
-        await img.paste(levelImg, (660, 187))
-
-        # 金币
-        pointImg = await BuildImage.build_text_image(
-            str(player.user["point"]), size=24, font_color=(253, 253, 253)
-        )
-        await img.paste(pointImg, (330, 255))
-
-        # 点券 TODO
-        bondsImg = await BuildImage.build_text_image(
-            "0", size=24, font_color=(253, 253, 253)
-        )
-        await img.paste(bondsImg, (570, 255))
-
-        # 清晰度
-        definition = Config.get_config("zhenxun_plugin_farm", "绘制农场清晰度")
-        if definition == "medium":
-            await img.resize(0.6)
-        elif definition == "hight":
-            await img.resize(0.8)
-        elif definition == "original":
-            pass
-        else:
-            await img.resize(0.4)
-
-        return img.pic2bytes()
-
-    @classmethod
-    async def drawDetailFarmByUid(cls, uid: str) -> list:
-        info = []
-        farm = await cls.drawFarmByUid(uid)
-        player = await g_pToolManager.getPlayerByUid(uid)
-        if not player:
-            return info
-
-        info.append(BuildImage.open(farm))
-
-        dataList = []
-        columnName = [
-            "-",
-            "土地ID",
-            "土地等级",
-            "作物名称",
-            "成熟时间",
-            "土地状态",
-            "被偷数量",
-            "剩余产出",
-        ]
-
-        icon = ""
-        soilNumber = player.user.get("soil", 3)
-
-        for i in range(1, soilNumber + 1):
-            soilInfo = await g_pDBService.userSoil.getUserSoil(uid, i)
-
-            if soilInfo:
-                match soilInfo.get("soilLevel", 0):
-                    case 1:
-                        name = "红土地.png"
-                    case 2:
-                        name = "黑土地.png"
-                    case 3:
-                        name = "金土地.png"
-                    case _:
-                        name = "普通土地.png"
-                iconPath = g_sResourcePath / "soil" / name
-
-                if iconPath.exists():
-                    icon = (iconPath, 33, 33)
-
-                plantName = soilInfo.get("plantName", "-")
-
-                if plantName == "-":
-                    matureTime = "-"
-                    soilStatus = "-"
-                    totalNumber = "-"
-                    plantNumber = "-"
-                else:
-                    matureTime = (
-                        g_pToolManager.dateTime()
-                        .fromtimestamp(int(soilInfo.get("matureTime", 0)))
-                        .strftime("%Y-%m-%d %H:%M:%S")
-                    )
-                    soilStatus = await g_pDBService.userSoil.getUserSoilStatus(uid, i)
-
-                    totalNumber = await g_pDBService.userSteal.getTotalStolenCount(
-                        uid, i
-                    )
-                    planInfo = await g_pDBService.plant.getPlantByName(plantName)
-
-                    if not planInfo:
-                        plantNumber = "None"
-                    else:
-                        plantNumber = f"{planInfo['harvest'] - totalNumber}"
-
-                dataList.append(
-                    [
-                        icon,
-                        i,
-                        await g_pDBService.userSoil.getSoilLevelText(
-                            soilInfo["soilLevel"]
-                        ),
-                        plantName,
-                        matureTime,
-                        soilStatus,
-                        totalNumber,
-                        plantNumber,
-                    ]
-                )
-
-                if len(dataList) >= 15:
-                    result = await ImageTemplate.table_page(
-                        "土地详细信息",
-                        "",
-                        columnName,
-                        dataList,
-                    )
-
-                    info.append(result.copy())
-                    dataList.clear()
-
-            if i >= soilNumber:
-                result = await ImageTemplate.table_page(
-                    "土地详细信息",
-                    "",
-                    columnName,
-                    dataList,
-                )
-
-                info.append(result.copy())
-                dataList.clear()
-
-        return info
-
-    @classmethod
-    async def drawSoilPlant(
-        cls, uid: str, soilIndex: int
-    ) -> tuple[bool, BuildImage, bool, int, int]:
-        """绘制植物资源
-
-        Args:
-            uid (str): 用户Uid
-            soilIndex (int): 土地索引 从1开始
-
-        Returns:
-            tuple[bool, BuildImage]: [绘制是否成功，资源图片, 是否成熟]
-        """
-
-        plant = None
-        soilInfo = await g_pDBService.userSoil.getUserSoil(uid, soilIndex)
-
-        if not soilInfo:
-            return False, None, False, 0, 0  # type: ignore
-
-        # 是否枯萎
-        if int(soilInfo.get("wiltStatus", 0)) == 1:
-            plant = BuildImage(background=g_sResourcePath / "plant/basic/9.png")
-            await plant.resize(0, 150, 212)
-            return True, plant, False, 0, 0
-
-        # 获取作物详细信息
-        plantInfo = await g_pDBService.plant.getPlantByName(soilInfo["plantName"])
-        if not plantInfo:
-            logger.error(f"绘制植物资源失败: {soilInfo['plantName']}")
-            return False, None, False, 0, 0  # type: ignore
-
-        offsetX = plantInfo.get("officX", 0)
-        offsetY = plantInfo.get("officY", 0)
-        offsetW = plantInfo.get("officW", 0)
-        offsetH = plantInfo.get("officH", 0)
-
-        currentTime = g_pToolManager.dateTime().now().timestamp()
-        phaseList = await g_pDBService.plant.getPlantPhaseByName(soilInfo["plantName"])
-
-        # 如果当前时间大于成熟时间 说明作物成熟
-        if currentTime >= soilInfo["matureTime"]:
-            plant = BuildImage(
-                background=g_sResourcePath
-                / f"plant/{soilInfo['plantName']}/{len(phaseList)}.png"
-            )
-
-            return True, plant, True, offsetX, offsetY
-        else:
-            # 如果是多阶段作物 且没有成熟 #早期思路 多阶段作物 直接是倒数第二阶段图片
-            # if soilInfo["harvestCount"] >= 1:
-            #     plant = BuildImage(
-            #         background=g_sResourcePath
-            #         / f"plant/{soilInfo['plantName']}/{plantInfo['phase'] - 1}.png"
-            #     )
-
-            #     return True, plant, False, offsetX, offsetY
-
-            # 如果没有成熟 则根据当前阶段进行绘制
-            elapsedTime = currentTime - soilInfo["plantTime"]
-            currentStage = currentStage = sum(
-                1 for thr in phaseList if elapsedTime >= thr
-            )
-
-            if currentStage <= 0:
-                if not plantInfo["general"]:
-                    plant = BuildImage(
-                        background=g_sResourcePath
-                        / f"plant/{soilInfo['plantName']}/0.png"
-                    )
-                else:
-                    plant = BuildImage(background=g_sResourcePath / "plant/basic/0.png")
-
-                await plant.resize(0, 35 + offsetW, 58 + offsetH)
-            else:
-                plant = BuildImage(
-                    background=g_sResourcePath
-                    / f"plant/{soilInfo['plantName']}/{currentStage}.png"
-                )
-
-        return True, plant, False, offsetX, offsetY
 
     @classmethod
     async def getUserSeedByUid(cls, uid: str) -> bytes:
@@ -449,7 +87,7 @@ class CFarmManager:
                 if not plantInfo:
                     continue
 
-                iconPath = g_sResourcePath / f"plant/{seedName}/icon.png"
+                iconPath = config.g_sResourcePath / f"plant/{seedName}/icon.png"
                 icon = (iconPath, 33, 33) if iconPath.exists() else ""
                 sellable = "可以" if plantInfo["sell"] else "不可以"
 
@@ -495,16 +133,18 @@ class CFarmManager:
                 count = 0  # 如果返回 None，则视为没有种子
 
             if count <= 0:
-                return g_sTranslation["sowing"]["noSeed"].format(name=name)
+                return config.g_sTranslation["sowing"]["noSeed"].format(name=name)
 
             # 如果播种数量超过仓库种子数量
             if count < num and num != -1:
-                return g_sTranslation["sowing"]["noNum"].format(name=name, num=count)
+                return config.g_sTranslation["sowing"]["noNum"].format(
+                    name=name, num=count
+                )
 
             # 获取用户土地数量
-            player = await g_pToolManager.getPlayerByUid(uid)
+            player = await getToolManager().getPlayerByUid(uid)
             if not player:
-                return g_sTranslation["basic"]["error"]
+                return config.g_sTranslation["basic"]["error"]
             soilNumber = player.user.get("soil", 3)
 
             # 如果播种数量为 -1，表示播种所有可播种的土地
@@ -540,13 +180,17 @@ class CFarmManager:
 
             # 根据播种结果给出反馈
             if num == 0:
-                return g_sTranslation["sowing"]["success"].format(name=name, num=count)
+                return config.g_sTranslation["sowing"]["success"].format(
+                    name=name, num=count
+                )
             else:
-                return g_sTranslation["sowing"]["success2"].format(name=name, num=count)
+                return config.g_sTranslation["sowing"]["success2"].format(
+                    name=name, num=count
+                )
 
         except Exception as e:
             logger.warning("播种操作失败！", e=e)
-            return g_sTranslation["sowing"]["error"]
+            return config.g_sTranslation["sowing"]["error"]
 
     @classmethod
     async def harvest(cls, uid: str) -> str:
@@ -561,9 +205,9 @@ class CFarmManager:
         try:
             await g_pEventManager.m_beforeHarvest.emit(uid=uid)  # type: ignore
 
-            player = await g_pToolManager.getPlayerByUid(uid)
+            player = await getToolManager().getPlayerByUid(uid)
             if not player:
-                return g_sTranslation["basic"]["error"]
+                return config.g_sTranslation["basic"]["error"]
             soilNumber = player.user.get("soil", 3)
 
             harvestRecords = []  # 收获日志记录
@@ -591,9 +235,11 @@ class CFarmManager:
                 if not plantInfo:
                     continue
 
-                currentTime = g_pToolManager.dateTime().now()
-                matureTime = g_pToolManager.dateTime().fromtimestamp(
-                    int(soilInfo["matureTime"])
+                currentTime = getToolManager().dateTime().now()
+                matureTime = (
+                    getToolManager()
+                    .dateTime()
+                    .fromtimestamp(int(soilInfo["matureTime"]))
                 )
 
                 if currentTime >= matureTime:
@@ -620,7 +266,7 @@ class CFarmManager:
                     experience = math.floor(experience * (100 + percent) // 100)
 
                     harvestRecords.append(
-                        g_sTranslation["harvest"]["append"].format(
+                        config.g_sTranslation["harvest"]["append"].format(
                             name=soilInfo["plantName"],
                             num=number,
                             exp=plantInfo["experience"],
@@ -680,19 +326,19 @@ class CFarmManager:
                 exp = player.user.get("exp", 0)
                 await player.addExp(exp + experience)
                 harvestRecords.append(
-                    g_sTranslation["harvest"]["exp"].format(
+                    config.g_sTranslation["harvest"]["exp"].format(
                         exp=experience,
                     )
                 )
 
             if harvestCount <= 0:
-                return g_sTranslation["harvest"]["no"]
+                return config.g_sTranslation["harvest"]["no"]
             else:
                 return "\n".join(harvestRecords)
 
         except Exception as e:
             logger.warning("收获操作失败！", e=e)
-            return g_sTranslation["harvest"]["error"]
+            return config.g_sTranslation["harvest"]["error"]
 
     @classmethod
     async def eradicate(cls, uid: str) -> str:
@@ -704,9 +350,9 @@ class CFarmManager:
         Returns:
             str: 返回
         """
-        player = await g_pToolManager.getPlayerByUid(uid)
+        player = await getToolManager().getPlayerByUid(uid)
         if not player:
-            return g_sTranslation["basic"]["error"]
+            return config.g_sTranslation["basic"]["error"]
         soilNumber = player.user.get("soil", 3)
 
         await g_pEventManager.m_beforeEradicate.emit(uid=uid)  # type: ignore
@@ -727,7 +373,7 @@ class CFarmManager:
 
             experience += 3
 
-            if g_bIsDebug:
+            if config.g_bIsDebug:
                 experience += 999
 
             # 更新数据库操作
@@ -754,9 +400,9 @@ class CFarmManager:
             exp = player.user.get("exp", 0)
             await player.addExp(exp + experience)
 
-            return g_sTranslation["eradicate"]["success"].format(exp=experience)
+            return config.g_sTranslation["eradicate"]["success"].format(exp=experience)
         else:
-            return g_sTranslation["eradicate"]["error"]
+            return config.g_sTranslation["eradicate"]["error"]
 
     @classmethod
     async def getUserPlantByUid(cls, uid: str) -> bytes:
@@ -797,7 +443,7 @@ class CFarmManager:
                 continue
 
             icon = ""
-            icon_path = g_sResourcePath / f"plant/{name}/icon.png"
+            icon_path = config.g_sResourcePath / f"plant/{name}/icon.png"
             if icon_path.exists():
                 icon = (icon_path, 33, 33)
 
@@ -841,16 +487,18 @@ class CFarmManager:
         """
         # 先判断该用户仓库是否有该作物
         if not await g_pDBService.userPlant.checkUserPlantByName(uid, name):
-            return g_sTranslation["lockPlant"]["noPlant"]
+            return config.g_sTranslation["lockPlant"]["noPlant"]
 
         # 更改加锁状态
         if await g_pDBService.userPlant.lockUserPlantByName(uid, name, lock):
             if lock == 0:
-                return g_sTranslation["lockPlant"]["unlockPlant"].format(name=name)
+                return config.g_sTranslation["lockPlant"]["unlockPlant"].format(
+                    name=name
+                )
             else:
-                return g_sTranslation["lockPlant"]["lockPlant"].format(name=name)
+                return config.g_sTranslation["lockPlant"]["lockPlant"].format(name=name)
         else:
-            return g_sTranslation["lockPlant"]["error"]
+            return config.g_sTranslation["lockPlant"]["error"]
 
     @classmethod
     async def stealing(cls, uid: str, target: str) -> str:
@@ -864,25 +512,25 @@ class CFarmManager:
             str: 返回
         """
         # 用户信息
-        player = await g_pToolManager.getPlayerByUid(uid)
+        player = await getToolManager().getPlayerByUid(uid)
         if not player:
-            return g_sTranslation["basic"]["error"]
+            return config.g_sTranslation["basic"]["error"]
 
         stealTime = player.user.get("stealTime", "")
         stealCount = int(player.user["stealCount"])
 
         if stealTime == "" or not stealTime:
-            stealTime = g_pToolManager.dateTime().date().today().strftime("%Y-%m-%d")
+            stealTime = getToolManager().dateTime().date().today().strftime("%Y-%m-%d")
             stealCount = 5
         elif (
-            g_pToolManager.dateTime().date().fromisoformat(stealTime)
-            != g_pToolManager.dateTime().date().today()
+            getToolManager().dateTime().date().fromisoformat(stealTime)
+            != getToolManager().dateTime().date().today()
         ):
-            stealTime = g_pToolManager.dateTime().date().today().strftime("%Y-%m-%d")
+            stealTime = getToolManager().dateTime().date().today().strftime("%Y-%m-%d")
             stealCount = 5
 
         if stealCount <= 0:
-            return g_sTranslation["stealing"]["max"]
+            return config.g_sTranslation["stealing"]["max"]
 
         # 获取用户解锁地块数量
         soilNumber = player.user.get("soil", 3)
@@ -908,9 +556,9 @@ class CFarmManager:
             if not plantInfo:
                 continue
 
-            currentTime = g_pToolManager.dateTime().now()
-            matureTime = g_pToolManager.dateTime().fromtimestamp(
-                int(soilInfo["matureTime"])
+            currentTime = getToolManager().dateTime().now()
+            matureTime = (
+                getToolManager().dateTime().fromtimestamp(int(soilInfo["matureTime"]))
             )
 
             if currentTime >= matureTime:
@@ -931,7 +579,7 @@ class CFarmManager:
                     )
 
                     harvestRecords.append(
-                        g_sTranslation["stealing"]["info"].format(
+                        config.g_sTranslation["stealing"]["info"].format(
                             name=soilInfo["plantName"], num=randomNumber
                         )
                     )
@@ -971,7 +619,7 @@ class CFarmManager:
                                 i,
                                 uid,
                                 randomNumber,
-                                int(g_pToolManager.dateTime().now().timestamp()),
+                                int(getToolManager().dateTime().now().timestamp()),
                             )
 
                     else:
@@ -980,13 +628,13 @@ class CFarmManager:
                             i,
                             uid,
                             randomNumber,
-                            int(g_pToolManager.dateTime().now().timestamp()),
+                            int(getToolManager().dateTime().now().timestamp()),
                         )
 
         if isStealingPlant <= 0 and isStealingNumber <= 0:
-            return g_sTranslation["stealing"]["noPlant"]
+            return config.g_sTranslation["stealing"]["noPlant"]
         elif isStealingPlant <= 0 and isStealingNumber > 0:
-            return g_sTranslation["stealing"]["repeat"]
+            return config.g_sTranslation["stealing"]["repeat"]
         else:
             stealCount -= 1
 
@@ -1004,15 +652,15 @@ class CFarmManager:
         Returns:
             str: 返回条件文本信息
         """
-        jLevel = await g_pJsonManager.getLevel()
+        jLevel = await getJsonManager().getLevel()
         rec = jLevel["reclamation"]
-        player = await g_pToolManager.getPlayerByUid(uid)
+        player = await getToolManager().getPlayerByUid(uid)
         if not player:
-            return g_sTranslation["basic"]["error"]
+            return config.g_sTranslation["basic"]["error"]
 
         try:
             if player.user["soil"] >= 30:
-                return g_sTranslation["reclamation"]["perfect"]
+                return config.g_sTranslation["reclamation"]["perfect"]
 
             rec = rec[f"{player.user['soil'] + 1}"]
 
@@ -1022,17 +670,17 @@ class CFarmManager:
 
             str = ""
             if len(item) == 0:
-                str = g_sTranslation["reclamation"]["next"].format(
+                str = config.g_sTranslation["reclamation"]["next"].format(
                     level=level, num=point
                 )
             else:
-                str = g_sTranslation["reclamation"]["next2"].format(
+                str = config.g_sTranslation["reclamation"]["next2"].format(
                     level=level, num=point, item=item
                 )
 
             return str
         except Exception:
-            return g_sTranslation["reclamation"]["error"]
+            return config.g_sTranslation["reclamation"]["error"]
 
     @classmethod
     async def reclamation(cls, uid: str) -> str:
@@ -1044,17 +692,17 @@ class CFarmManager:
         Returns:
             str: _description_
         """
-        player = await g_pToolManager.getPlayerByUid(uid)
+        player = await getToolManager().getPlayerByUid(uid)
         if not player:
-            return g_sTranslation["basic"]["error"]
+            return config.g_sTranslation["basic"]["error"]
         level = await player.getUserLevel()
 
-        jsonLevel = await g_pJsonManager.getLevel()
+        jsonLevel = await getJsonManager().getLevel()
         rec = jsonLevel["reclamation"]
 
         try:
             if player.user["soil"] >= 30:
-                return g_sTranslation["reclamation"]["perfect"]
+                return config.g_sTranslation["reclamation"]["perfect"]
 
             rec = rec[f"{player.user['soil'] + 1}"]
 
@@ -1063,20 +711,20 @@ class CFarmManager:
             # item = rec["item"]
 
             if level[0] < levelFileter:
-                return g_sTranslation["reclamation"]["nextLevel"].format(
+                return config.g_sTranslation["reclamation"]["nextLevel"].format(
                     level=level[0], next=levelFileter
                 )
 
             if player.user["point"] < point:
-                return g_sTranslation["reclamation"]["noNum"].format(num=point)
+                return config.g_sTranslation["reclamation"]["noNum"].format(num=point)
 
             # TODO 缺少判断消耗的item
             await player.subPoint("point", point)
             await player.updateField("soil", player.user["soil"] + 1)
 
-            return g_sTranslation["reclamation"]["success"]
+            return config.g_sTranslation["reclamation"]["success"]
         except Exception:
-            return g_sTranslation["reclamation"]["error1"]
+            return config.g_sTranslation["reclamation"]["error1"]
 
     @classmethod
     async def soilUpgradeCondition(cls, uid: str, soilIndex: int) -> str:
@@ -1092,18 +740,18 @@ class CFarmManager:
         soilInfo = await g_pDBService.userSoil.getUserSoil(uid, soilIndex)
 
         if not soilInfo:
-            return g_sTranslation["soilInfo"]["error"]
+            return config.g_sTranslation["soilInfo"]["error"]
 
         soilLevel = soilInfo.get("soilLevel", 0) + 1
-        if soilLevel >= g_iSoilLevelMax:
-            return g_sTranslation["soilInfo"]["error1"]
+        if soilLevel >= config.g_iSoilLevelMax:
+            return config.g_sTranslation["soilInfo"]["error1"]
 
         # 获取用户当前土地 的下一级土地 数量
         countSoil = await g_pDBService.userSoil.countSoilByLevel(uid, soilLevel)
 
         # 获取升级所需
         soilLevelText = await g_pDBService.userSoil.getSoilLevel(soilLevel)
-        jSoil = await g_pJsonManager.getSoil()
+        jSoil = await getJsonManager().getSoil()
         fileter = jSoil["upgrade"][soilLevelText][countSoil]
 
         nextLevel = await g_pDBService.userSoil.getSoilLevelText(soilLevel)
@@ -1139,22 +787,22 @@ class CFarmManager:
         Returns:
             str:
         """
-        player = await g_pToolManager.getPlayerByUid(uid)
+        player = await getToolManager().getPlayerByUid(uid)
         if not player:
-            return g_sTranslation["basic"]["error"]
+            return config.g_sTranslation["basic"]["error"]
 
         soilInfo = await g_pDBService.userSoil.getUserSoil(uid, soilIndex)
         if not soilInfo:
-            return g_sTranslation["soilInfo"]["error"]
+            return config.g_sTranslation["soilInfo"]["error"]
 
         soilLevel = soilInfo.get("soilLevel", 0) + 1
-        if soilLevel >= g_iSoilLevelMax:
-            return g_sTranslation["soilInfo"]["error1"]
+        if soilLevel >= config.g_iSoilLevelMax:
+            return config.g_sTranslation["soilInfo"]["error1"]
 
         countSoil = await g_pDBService.userSoil.countSoilByLevel(uid, soilLevel)
 
         soilLevelText = await g_pDBService.userSoil.getSoilLevel(soilLevel)
-        soil = await g_pJsonManager.getSoil()
+        soil = await getJsonManager().getSoil()
         fileter = soil["upgrade"][soilLevelText][countSoil]
 
         getters = {
@@ -1188,9 +836,9 @@ class CFarmManager:
         await player.subPoint("point", fileter.get("point", 0))
         await player.subPoint("vipPoint", fileter.get("vipPoint", 0))
 
-        return g_sTranslation["soilInfo"]["success"].format(
+        return config.g_sTranslation["soilInfo"]["success"].format(
             name=await g_pDBService.userSoil.getSoilLevelText(soilLevel),
-            text=g_sTranslation["soilInfo"][soilLevelText],
+            text=config.g_sTranslation["soilInfo"][soilLevelText],
         )
 
     @classmethod
@@ -1218,9 +866,9 @@ class CFarmManager:
         pro = int(Config.get_config("zhenxun_plugin_farm", "点券兑换倍数"))
         pro *= num
 
-        player = await g_pToolManager.getPlayerByUid(uid)
+        player = await getToolManager().getPlayerByUid(uid)
         if not player:
-            return g_sTranslation["basic"]["error"]
+            return config.g_sTranslation["basic"]["error"]
 
         point = player.user.get("point", 0)
         if point < pro:
@@ -1241,6 +889,3 @@ class CFarmManager:
         await player.subPoint("point", pro)
 
         return f"兑换{num}点券成功，当前点券：{number}，赠送点券：{giftPoints}，当前农场币：{point}"
-
-
-g_pFarmManager = CFarmManager()

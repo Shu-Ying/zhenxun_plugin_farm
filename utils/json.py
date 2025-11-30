@@ -2,8 +2,7 @@ import json
 
 from zhenxun.services.log import logger
 
-from . import config
-from .request import g_pRequestManager
+from . import config, getRequestManager
 
 
 class CJsonManager:
@@ -117,7 +116,7 @@ class CJsonManager:
             return False
 
     async def initSignInFile(self) -> bool:
-        if not await g_pRequestManager.initSignInFile():
+        if not await getRequestManager().initSignInFile():
             config.g_bSignStatus = False
             return False
         else:

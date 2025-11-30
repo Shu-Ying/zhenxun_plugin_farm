@@ -4,8 +4,11 @@ from .database import CSqlManager
 
 
 class CUserItemDB(CSqlManager):
-    @classmethod
-    async def initDB(cls):
+    def __init__(self):
+        super().__init__()
+        self.m_sTableName = "userItem"
+
+    async def initDB(self):
         userItem = {
             "uid": "TEXT NOT NULL",  # 用户Uid
             "item": "TEXT NOT NULL",  # 物品名称
@@ -13,7 +16,8 @@ class CUserItemDB(CSqlManager):
             "PRIMARY KEY": "(uid, item)",
         }
 
-        await cls.ensureTableSchema("userItem", userItem)
+        await self.ensureTableSchema("userItem", userItem)
+        self.setInitialized()
 
     @classmethod
     async def getUserItemByName(cls, uid: str, item: str) -> int | None:
@@ -29,7 +33,7 @@ class CUserItemDB(CSqlManager):
         if not uid or not item:
             return None
         try:
-            async with cls.m_pDB.execute(
+            async with cls.getDB().execute(
                 "SELECT count FROM userItem WHERE uid = ? AND item = ?", (uid, item)
             ) as cursor:
                 row = await cursor.fetchone()
@@ -51,7 +55,7 @@ class CUserItemDB(CSqlManager):
         if not uid:
             return {}
         try:
-            cursor = await cls.m_pDB.execute(
+            cursor = await cls.getDB().execute(
                 "SELECT item, count FROM userItem WHERE uid = ?", (uid,)
             )
             rows = await cursor.fetchall()
@@ -75,7 +79,7 @@ class CUserItemDB(CSqlManager):
             return False
         try:
             async with cls._transaction():
-                await cls.m_pDB.execute(
+                await cls.getDB().execute(
                     "DELETE FROM userItem WHERE uid = ? AND item = ?", (uid, item)
                 )
             return True
@@ -100,11 +104,11 @@ class CUserItemDB(CSqlManager):
         try:
             async with cls._transaction():
                 if count <= 0:
-                    await cls.m_pDB.execute(
+                    await cls.getDB().execute(
                         "DELETE FROM userItem WHERE uid = ? AND item = ?", (uid, item)
                     )
                 else:
-                    await cls.m_pDB.execute(
+                    await cls.getDB().execute(
                         "UPDATE userItem SET count = ? WHERE uid = ? AND item = ?",
                         (count, uid, item),
                     )
@@ -129,7 +133,7 @@ class CUserItemDB(CSqlManager):
             return False
         try:
             async with cls._transaction():
-                async with cls.m_pDB.execute(
+                async with cls.getDB().execute(
                     "SELECT count FROM userItem WHERE uid = ? AND item = ?", (uid, item)
                 ) as cursor:
                     row = await cursor.fetchone()
@@ -137,18 +141,18 @@ class CUserItemDB(CSqlManager):
                 if row:
                     newCount = row[0] + count
                     if newCount <= 0:
-                        await cls.m_pDB.execute(
+                        await cls.getDB().execute(
                             "DELETE FROM userItem WHERE uid = ? AND item = ?",
                             (uid, item),
                         )
                     else:
-                        await cls.m_pDB.execute(
+                        await cls.getDB().execute(
                             "UPDATE userItem SET count = ? WHERE uid = ? AND item = ?",
                             (newCount, uid, item),
                         )
                 else:
                     if count > 0:
-                        await cls.m_pDB.execute(
+                        await cls.getDB().execute(
                             "INSERT INTO userItem (uid, item, count) VALUES (?, ?, ?)",
                             (uid, item, count),
                         )

@@ -1,4 +1,4 @@
-from ..dbService import g_pDBService
+from .. import g_pDBlocator
 
 
 class CPlayer:
@@ -24,7 +24,7 @@ class CPlayer:
         if uid == "":
             return False
 
-        self.user = await g_pDBService.user.getUserInfoByUid(uid)
+        self.user = await g_pDBlocator.getUserManager().getUserInfoByUid(uid)
 
         return True
 
@@ -39,7 +39,7 @@ class CPlayer:
         if uid == "":
             return False
 
-        return await g_pDBService.user.isRegistered(uid)
+        return await g_pDBlocator.getUserManager().isRegistered(uid)
 
     async def addPoint(self, type: str, index: int) -> bool:
         """增加货币
@@ -53,7 +53,7 @@ class CPlayer:
         """
         uid = self.user.get("uid", "")
 
-        if uid == "" or type not in g_pDBService.user.currencies:
+        if uid == "" or type not in g_pDBlocator.getUserManager().currencies:
             return False
 
         if index == 0:
@@ -64,7 +64,7 @@ class CPlayer:
         if nowIndex < 0:
             nowIndex = 0
 
-        if await g_pDBService.user.updatePoint(uid, type, nowIndex):
+        if await g_pDBlocator.getUserManager().updatePoint(uid, type, nowIndex):
             self.user[type] = nowIndex
             return True
 
@@ -82,7 +82,7 @@ class CPlayer:
         """
         uid = self.user.get("uid", "")
 
-        if uid == "" or type not in g_pDBService.user.currencies:
+        if uid == "" or type not in g_pDBlocator.getUserManager().currencies:
             return False
 
         if index == 0:
@@ -93,7 +93,7 @@ class CPlayer:
         if nowIndex < 0:
             nowIndex = 0
 
-        if await g_pDBService.user.updatePoint(uid, type, nowIndex):
+        if await g_pDBlocator.getUserManager().updatePoint(uid, type, nowIndex):
             self.user[type] = nowIndex
             return True
 
@@ -121,7 +121,7 @@ class CPlayer:
         if nowExp < 0:
             nowExp = 0
 
-        if await g_pDBService.user.updateExp(uid, nowExp):
+        if await g_pDBlocator.getUserManager().updateExp(uid, nowExp):
             self.user["exp"] = nowExp
             return True
 
@@ -149,7 +149,7 @@ class CPlayer:
         if nowExp < 0:
             nowExp = 0
 
-        if await g_pDBService.user.updateExp(uid, nowExp):
+        if await g_pDBlocator.getUserManager().updateExp(uid, nowExp):
             self.user["exp"] = nowExp
             return True
 
@@ -169,7 +169,7 @@ class CPlayer:
         if uid == "":
             return "error"
 
-        return await g_pDBService.user.updateName(uid, name)
+        return await g_pDBlocator.getUserManager().updateName(uid, name)
 
     async def getUserLevel(self) -> tuple[int, int, int]:
         """获取用户等级信息
@@ -183,7 +183,7 @@ class CPlayer:
         if uid == "":
             return -1, -1, -1
 
-        return await g_pDBService.user.getUserLevelByUid(uid)
+        return await g_pDBlocator.getUserManager().getUserLevelByUid(uid)
 
     async def updateStealCountByUid(
         self, uid: str, stealTime: str, stealCount: int
@@ -203,7 +203,9 @@ class CPlayer:
         if uid == "":
             return False
 
-        return await g_pDBService.user.updateStealCountByUid(uid, stealTime, stealCount)
+        return await g_pDBlocator.getUserManager().updateStealCountByUid(
+            uid, stealTime, stealCount
+        )
 
     async def updateField(self, field: str, value) -> bool:
         """更新单字段信息
@@ -216,4 +218,4 @@ class CPlayer:
         if uid == "":
             return False
 
-        return await g_pDBService.user.updateFieldByUid(uid, field, value)
+        return await g_pDBlocator.getUserManager().updateFieldByUid(uid, field, value)

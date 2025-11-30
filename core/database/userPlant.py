@@ -4,8 +4,11 @@ from .database import CSqlManager
 
 
 class CUserPlantDB(CSqlManager):
-    @classmethod
-    async def initDB(cls):
+    def __init__(self):
+        super().__init__()
+        self.m_sTableName = "userPlant"
+
+    async def initDB(self):
         userPlant = {
             "uid": "TEXT NOT NULL",  # 用户Uid
             "plant": "TEXT NOT NULL",  # 作物名称
@@ -14,7 +17,8 @@ class CUserPlantDB(CSqlManager):
             "PRIMARY KEY": "(uid, plant)",
         }
 
-        await cls.ensureTableSchema("userPlant", userPlant)
+        await self.ensureTableSchema("userPlant", userPlant)
+        self.setInitialized()
 
     @classmethod
     async def addUserPlantByUid(cls, uid: str, plant: str, count: int = 1) -> bool:
@@ -31,7 +35,7 @@ class CUserPlantDB(CSqlManager):
         try:
             async with cls._transaction():
                 # 检查是否已存在该作物
-                async with cls.m_pDB.execute(
+                async with cls.getDB().execute(
                     "SELECT count FROM userPlant WHERE uid = ? AND plant = ?",
                     (uid, plant),
                 ) as cursor:
@@ -40,13 +44,13 @@ class CUserPlantDB(CSqlManager):
                 if row:
                     # 如果作物已存在，则更新数量
                     new_count = row[0] + count
-                    await cls.m_pDB.execute(
+                    await cls.getDB().execute(
                         "UPDATE userPlant SET count = ? WHERE uid = ? AND plant = ?",
                         (new_count, uid, plant),
                     )
                 else:
                     # 如果作物不存在，则插入新记录
-                    await cls.m_pDB.execute(
+                    await cls.getDB().execute(
                         "INSERT INTO userPlant (uid, plant, count) VALUES (?, ?, ?)",
                         (uid, plant, count),
                     )
@@ -65,7 +69,7 @@ class CUserPlantDB(CSqlManager):
         Returns:
             Dict[str, int]: 作物名称和数量
         """
-        cursor = await cls.m_pDB.execute(
+        cursor = await cls.getDB().execute(
             "SELECT plant, count FROM userPlant WHERE uid=?", (uid,)
         )
         rows = await cursor.fetchall()
@@ -83,7 +87,7 @@ class CUserPlantDB(CSqlManager):
             Optional[int]: 作物数量
         """
         try:
-            async with cls.m_pDB.execute(
+            async with cls.getDB().execute(
                 "SELECT count FROM userPlant WHERE uid = ? AND plant = ?", (uid, plant)
             ) as cursor:
                 row = await cursor.fetchone()
@@ -104,7 +108,7 @@ class CUserPlantDB(CSqlManager):
             bool: 是否存在
         """
         try:
-            async with cls.m_pDB.execute(
+            async with cls.getDB().execute(
                 "SELECT * FROM userPlant WHERE uid = ? AND plant = ?", (uid, plant)
             ) as cursor:
                 row = await cursor.fetchone()
@@ -130,7 +134,7 @@ class CUserPlantDB(CSqlManager):
                 return await cls.deleteUserPlantByName(uid, plant)
 
             async with cls._transaction():
-                await cls.m_pDB.execute(
+                await cls.getDB().execute(
                     "UPDATE userPlant SET count = ? WHERE uid = ? AND plant = ?",
                     (count, uid, plant),
                 )
@@ -153,7 +157,7 @@ class CUserPlantDB(CSqlManager):
         """
         try:
             async with cls._transaction():
-                await cls.m_pDB.execute(
+                await cls.getDB().execute(
                     "UPDATE userPlant SET isLock = ? WHERE uid = ? AND plant = ?",
                     (lock, uid, plant),
                 )
@@ -174,7 +178,7 @@ class CUserPlantDB(CSqlManager):
             bool: 是否加锁
         """
         try:
-            async with cls.m_pDB.execute(
+            async with cls.getDB().execute(
                 "SELECT isLock FROM userPlant WHERE uid = ? AND plant = ?", (uid, plant)
             ) as cursor:
                 row = await cursor.fetchone()
@@ -196,7 +200,7 @@ class CUserPlantDB(CSqlManager):
         """
         try:
             async with cls._transaction():
-                await cls.m_pDB.execute(
+                await cls.getDB().execute(
                     "DELETE FROM userPlant WHERE uid = ? AND plant = ?", (uid, plant)
                 )
             return True

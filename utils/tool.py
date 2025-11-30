@@ -9,8 +9,7 @@ from playwright.async_api import async_playwright
 from zhenxun.services.log import logger
 from zhenxun.utils.message import MessageUtils
 
-from ..core.player.player import CPlayer
-from ..core.player.playerPool import g_pUserPool
+from ..core import CPlayer, g_pUserPool
 
 
 class CToolManager:
@@ -192,6 +191,3 @@ class CToolManager:
             # 截图并保存到本地文件
             await page.screenshot(path=save, full_page=True)
             await browser.close()
-
-
-g_pToolManager = CToolManager()

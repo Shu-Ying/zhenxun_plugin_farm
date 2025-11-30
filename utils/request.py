@@ -15,8 +15,7 @@ from zhenxun.configs.config import Config
 from zhenxun.services.log import logger
 
 from ..core.dbService import g_pDBService
-from .config import g_sPlantPath, g_sSignInPath
-from .tool import g_pToolManager
+from . import config, getToolManager
 
 
 class CRequestManager:
@@ -162,14 +161,14 @@ class CRequestManager:
 
     @classmethod
     async def initSignInFile(cls) -> bool:
-        if os.path.exists(g_sSignInPath):
+        if os.path.exists(config.g_sSignInPath):
             try:
-                with open(g_sSignInPath, encoding="utf-8") as f:
+                with open(config.g_sSignInPath, encoding="utf-8") as f:
                     content = f.read()
                     sign = json.loads(content)
 
                 date = sign.get("date", "")
-                yearMonth = g_pToolManager.dateTime().now().strftime("%Y%m")
+                yearMonth = getToolManager().dateTime().now().strftime("%Y%m")
 
                 if date == yearMonth:
                     logger.debug("真寻农场签到文件检查完毕")
@@ -193,8 +192,8 @@ class CRequestManager:
         try:
             baseUrl = Config.get_config("zhenxun_plugin_farm", "服务地址")
             url = f"{baseUrl.rstrip('/')}:8998/sign_in"
-            path = str(g_sSignInPath.parent.resolve(strict=False))
-            yearMonth = g_pToolManager.dateTime().now().strftime("%Y%m")
+            path = str(config.g_sSignInPath.parent.resolve(strict=False))
+            yearMonth = getToolManager().dateTime().now().strftime("%Y%m")
 
             # 下载为 signTemp.json
             success = await cls.download(
@@ -208,7 +207,7 @@ class CRequestManager:
                 return False
 
             # 重命名为 sign_in.json
-            g_pToolManager.renameFile(f"{path}/signTemp.json", "sign_in.json")
+            getToolManager().renameFile(f"{path}/signTemp.json", "sign_in.json")
             return True
         except Exception as e:
             logger.error("下载签到文件失败", e=e)
@@ -221,7 +220,7 @@ class CRequestManager:
         Returns:
             bool: 是否为最新版或成功更新
         """
-        versionPath = os.path.join(os.path.dirname(g_sPlantPath), "version.json")
+        versionPath = os.path.join(os.path.dirname(config.g_sPlantPath), "version.json")
 
         try:
             with open(versionPath, encoding="utf-8") as f:
@@ -262,7 +261,7 @@ class CRequestManager:
         """
         baseUrl = Config.get_config("zhenxun_plugin_farm", "服务地址")
 
-        savePath = os.path.dirname(g_sPlantPath)
+        savePath = os.path.dirname(config.g_sPlantPath)
         success = await cls.download(
             url=f"{baseUrl.rstrip('/')}:8998/file/plant.db",
             savePath=savePath,
@@ -273,7 +272,7 @@ class CRequestManager:
             return False
 
         # 重命名为 sign_in.json
-        g_pToolManager.renameFile(f"{savePath}/plantTemp.db", "plant.db")
+        getToolManager().renameFile(f"{savePath}/plantTemp.db", "plant.db")
 
         versionPath = os.path.join(savePath, "version.json")
         try:
@@ -288,6 +287,3 @@ class CRequestManager:
         await g_pDBService.plant.downloadPlant()
 
         return True
-
-
-g_pRequestManager = CRequestManager()

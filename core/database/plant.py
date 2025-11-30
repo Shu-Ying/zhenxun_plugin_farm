@@ -6,14 +6,16 @@ import aiosqlite
 from zhenxun.configs.config import Config
 from zhenxun.services.log import logger
 
-from ...utils.config import g_bIsDebug, g_sPlantPath, g_sResourcePath
-from ...utils.request import g_pRequestManager
+from ...utils import config, getRequestManager
 
 
 class CPlantManager:
     def __init__(self):
+        self.m_sTableName = "plant"
+        self.m_bInitialized = False
+
         try:
-            os.mkdir(g_sPlantPath)
+            os.mkdir(config.g_sPlantPath)
         except FileExistsError:
             pass
 
@@ -23,20 +25,23 @@ class CPlantManager:
 
     async def init(self) -> bool:
         try:
-            _ = os.path.exists(g_sPlantPath)
+            _ = os.path.exists(config.g_sPlantPath)
 
-            if g_bIsDebug:
+            if config.g_bIsDebug:
                 self.m_pDB = await aiosqlite.connect(
-                    str(g_sPlantPath.parent / "plant-test.db")
+                    str(config.g_sPlantPath.parent / "plant-test.db")
                 )
             else:
-                self.m_pDB = await aiosqlite.connect(str(g_sPlantPath))
+                self.m_pDB = await aiosqlite.connect(str(config.g_sPlantPath))
 
             self.m_pDB.row_factory = aiosqlite.Row
             return True
         except Exception as e:
             logger.warning("初始化植物数据库失败", e=e)
             return False
+
+    async def initDB(self):
+        self.m_bInitialized = True
 
     @asynccontextmanager
     async def _transaction(self):
@@ -254,7 +259,7 @@ class CPlantManager:
             for plant in plants:
                 name = plant["name"]
                 phaseCount = await self.getPlantPhaseNumberByName(name)
-                saveDir = os.path.join(g_sResourcePath, "plant", name)
+                saveDir = os.path.join(config.g_sResourcePath, "plant", name)
                 begin = 0 if plant["general"] == 0 else 1
 
                 for idx in range(begin, phaseCount + 1):
@@ -265,14 +270,18 @@ class CPlantManager:
                         continue
 
                     url = f"{baseUrl}/{name}/{idx}.png"
-                    if not await g_pRequestManager.download(url, saveDir, f"{idx}.png"):
+                    if not await getRequestManager().download(
+                        url, saveDir, f"{idx}.png"
+                    ):
                         success = False
 
                 iconName = "icon.png"
                 iconPath = os.path.join(saveDir, iconName)
                 if not os.path.exists(iconPath):
                     iconUrl = f"{baseUrl}/{name}/{iconName}"
-                    if not await g_pRequestManager.download(iconUrl, saveDir, iconName):
+                    if not await getRequestManager().download(
+                        iconUrl, saveDir, iconName
+                    ):
                         success = False
 
             return success

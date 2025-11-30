@@ -4,8 +4,11 @@ from .database import CSqlManager
 
 
 class CUserSeedDB(CSqlManager):
-    @classmethod
-    async def initDB(cls):
+    def __init__(self):
+        super().__init__()
+        self.m_sTableName = "userSeed"
+
+    async def initDB(self):
         userSeed = {
             "uid": "TEXT NOT NULL",  # 用户Uid
             "seed": "TEXT NOT NULL",  # 种子名称
@@ -13,7 +16,8 @@ class CUserSeedDB(CSqlManager):
             "PRIMARY KEY": "(uid, seed)",
         }
 
-        await cls.ensureTableSchema("userSeed", userSeed)
+        await self.ensureTableSchema("userSeed", userSeed)
+        self.setInitialized()
 
     @classmethod
     async def addUserSeedByUid(cls, uid: str, seed: str, count: int = 1) -> bool:
@@ -29,26 +33,26 @@ class CUserSeedDB(CSqlManager):
         """
         try:
             async with cls._transaction():
-                async with cls.m_pDB.execute(
+                async with cls.getDB().execute(
                     "SELECT count FROM userSeed WHERE uid = ? AND seed = ?", (uid, seed)
                 ) as cursor:
                     row = await cursor.fetchone()
 
                 if row:
                     newCount = row[0] + count
-                    await cls.m_pDB.execute(
+                    await cls.getDB().execute(
                         "UPDATE userSeed SET count = ? WHERE uid = ? AND seed = ?",
                         (newCount, uid, seed),
                     )
                 else:
                     newCount = count
-                    await cls.m_pDB.execute(
+                    await cls.getDB().execute(
                         "INSERT INTO userSeed (uid, seed, count) VALUES (?, ?, ?)",
                         (uid, seed, count),
                     )
 
                 if newCount <= 0:
-                    await cls.m_pDB.execute(
+                    await cls.getDB().execute(
                         "DELETE FROM userSeed WHERE uid = ? AND seed = ?", (uid, seed)
                     )
             return True
@@ -66,7 +70,7 @@ class CUserSeedDB(CSqlManager):
             if existing is not None:
                 await cls._updateUserSeedByName(uid, seed, newCount)
             else:
-                await cls.m_pDB.execute(
+                await cls.getDB().execute(
                     "INSERT INTO userSeed (uid, seed, count) VALUES (?, ?, ?)",
                     (uid, seed, newCount),
                 )
@@ -92,7 +96,7 @@ class CUserSeedDB(CSqlManager):
         """
 
         try:
-            async with cls.m_pDB.execute(
+            async with cls.getDB().execute(
                 "SELECT count FROM userSeed WHERE uid = ? AND seed = ?", (uid, seed)
             ) as cursor:
                 row = await cursor.fetchone()
@@ -112,7 +116,7 @@ class CUserSeedDB(CSqlManager):
             dict: 种子信息
         """
 
-        cursor = await cls.m_pDB.execute(
+        cursor = await cls.getDB().execute(
             "SELECT seed, count FROM userSeed WHERE uid=?", (uid,)
         )
         rows = await cursor.fetchall()
@@ -135,7 +139,7 @@ class CUserSeedDB(CSqlManager):
                 return await cls.deleteUserSeedByName(uid, seed)
 
             async with cls._transaction():
-                await cls.m_pDB.execute(
+                await cls.getDB().execute(
                     "UPDATE userSeed SET count = ? WHERE uid = ? AND seed = ?",
                     (count, uid, seed),
                 )
@@ -161,7 +165,7 @@ class CUserSeedDB(CSqlManager):
                 return await cls.deleteUserSeedByName(uid, seed)
 
             async with cls._transaction():
-                await cls.m_pDB.execute(
+                await cls.getDB().execute(
                     "UPDATE userSeed SET count = ? WHERE uid = ? AND seed = ?",
                     (count, uid, seed),
                 )
@@ -183,7 +187,7 @@ class CUserSeedDB(CSqlManager):
         """
         try:
             async with cls._transaction():
-                await cls.m_pDB.execute(
+                await cls.getDB().execute(
                     "DELETE FROM userSeed WHERE uid = ? AND seed = ?", (uid, seed)
                 )
             return True
@@ -203,7 +207,7 @@ class CUserSeedDB(CSqlManager):
             bool: 是否成功
         """
         try:
-            await cls.m_pDB.execute(
+            await cls.getDB().execute(
                 "DELETE FROM userSeed WHERE uid = ? AND seed = ?", (uid, seed)
             )
             return True

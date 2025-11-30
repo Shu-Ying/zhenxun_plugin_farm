@@ -7,17 +7,18 @@ from zhenxun.services.log import logger
 from zhenxun.utils.message import MessageUtils
 
 from .command import diuse_farm, diuse_register, reclamation
-from .core.activity.sign_in import g_pSignInManager
-from .core.database.database import g_pSqlManager
+from .core import (
+    CHelpManager,
+    CShopManager,
+    g_pDBlocator,
+    g_pSqlManager,
+    g_pUserPool,
+    getFarmManager,
+    getSignInManager,
+)
 from .core.dbService import g_pDBService
-from .core.farm import g_pFarmManager
-from .core.help import g_pHelpManager
-from .core.player.playerPool import g_pUserPool
-from .core.shop import g_pShopManager
-from .event.event import g_pEventManager
-from .utils.config import g_sResourcePath, g_sTranslation
-from .utils.json import g_pJsonManager
-from .utils.request import g_pRequestManager
+from .event import g_pEventManager
+from .utils import config, getJsonManager, getRequestManager
 
 __plugin_meta__ = PluginMetadata(
     name="真寻农场",
@@ -102,9 +103,9 @@ async def start():
     await g_pDBService.init()
 
     # 检查作物文件是否缺失 or 更新
-    await g_pRequestManager.initPlantDBFile()
+    await getRequestManager().initPlantDBFile()
 
-    await g_pHelpManager.createHelpImage()
+    await CHelpManager.createHelpImage()
 
     # todayRewards = [
     #     {
@@ -141,7 +142,7 @@ async def shutdown():
 @scheduler.scheduled_job(trigger="cron", hour=4, minute=30, id="signInFile")
 async def signInFile():
     try:
-        await g_pJsonManager.initSignInFile()
-        await g_pRequestManager.initPlantDBFile()
+        await getJsonManager().initSignInFile()
+        await getRequestManager().initPlantDBFile()
     except Exception as e:
         logger.error("农场定时检查出错", e=e)

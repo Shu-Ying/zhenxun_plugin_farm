@@ -4,8 +4,11 @@ from .database import CSqlManager
 
 
 class CUserPlantCountDB(CSqlManager):
-    @classmethod
-    async def initDB(cls):
+    def __init__(self):
+        super().__init__()
+        self.m_sTableName = "userPlantCount"
+
+    async def initDB(self):
         userPlantCount = {
             "uid": "TEXT NOT NULL",  # 用户Uid
             "plant": "TEXT NOT NULL",  # 植物名称
@@ -13,7 +16,8 @@ class CUserPlantCountDB(CSqlManager):
             "PRIMARY KEY": "(uid, plant)",
         }
 
-        await cls.ensureTableSchema("userPlantCount", userPlantCount)
+        await self.ensureTableSchema("userPlantCount", userPlantCount)
+        self.setInitialized()
 
     @classmethod
     async def addUserPlantCountByUid(cls, uid: str, plant: str, count: int = 1) -> bool:
@@ -29,7 +33,7 @@ class CUserPlantCountDB(CSqlManager):
         """
         try:
             async with cls._transaction():
-                async with cls.m_pDB.execute(
+                async with cls.getDB().execute(
                     "SELECT count FROM userPlantCount WHERE uid = ? AND plant = ?",
                     (uid, plant),
                 ) as cursor:
@@ -37,19 +41,19 @@ class CUserPlantCountDB(CSqlManager):
 
                 if row:
                     newCount = row[0] + count
-                    await cls.m_pDB.execute(
+                    await cls.getDB().execute(
                         "UPDATE userPlantCount SET count = ? WHERE uid = ? AND plant = ?",
                         (newCount, uid, plant),
                     )
                 else:
                     newCount = count
-                    await cls.m_pDB.execute(
+                    await cls.getDB().execute(
                         "INSERT INTO userPlantCount (uid, plant, count) VALUES (?, ?, ?)",
                         (uid, plant, count),
                     )
 
                 if newCount <= 0:
-                    await cls.m_pDB.execute(
+                    await cls.getDB().execute(
                         "DELETE FROM userPlantCount WHERE uid = ? AND plant = ?",
                         (uid, plant),
                     )
@@ -69,7 +73,7 @@ class CUserPlantCountDB(CSqlManager):
             dict: 植物信息
         """
 
-        cursor = await cls.m_pDB.execute(
+        cursor = await cls.getDB().execute(
             "SELECT plant, count FROM userPlantCount WHERE uid=?", (uid,)
         )
         rows = await cursor.fetchall()
@@ -86,7 +90,7 @@ class CUserPlantCountDB(CSqlManager):
         Returns:
             int: 收获次数
         """
-        cursor = await cls.m_pDB.execute(
+        cursor = await cls.getDB().execute(
             "SELECT count FROM userPlantCount WHERE uid = ? AND plant = ?",
             (uid, plant),
         )
@@ -110,7 +114,7 @@ class CUserPlantCountDB(CSqlManager):
                 return await cls.deleteUserPlantCountByName(uid, plant)
 
             async with cls._transaction():
-                await cls.m_pDB.execute(
+                await cls.getDB().execute(
                     "UPDATE userPlantCount SET count = ? WHERE uid = ? AND plant = ?",
                     (count, uid, plant),
                 )
@@ -132,7 +136,7 @@ class CUserPlantCountDB(CSqlManager):
         """
         try:
             async with cls._transaction():
-                await cls.m_pDB.execute(
+                await cls.getDB().execute(
                     "DELETE FROM userPlantCount WHERE uid = ? AND plant = ?",
                     (uid, plant),
                 )

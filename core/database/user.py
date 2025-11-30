@@ -1,11 +1,13 @@
 import math
 
-from ...utils.tool import g_pToolManager
+from ...utils import getToolManager
 from .database import CSqlManager
 
 
 class CUserDB(CSqlManager):
     def __init__(self):
+        super().__init__()
+        self.m_sTableName = "user"
         self.currencies: list[str] = ["point", "vipPoint"]
 
     async def initDB(self):
@@ -21,6 +23,7 @@ class CUserDB(CSqlManager):
         }
 
         await self.ensureTableSchema("user", userInfo)
+        self.setInitialized()
 
     async def initUserInfo(self, uid: str, name: str) -> bool:
         """初始化用户信息
@@ -32,7 +35,7 @@ class CUserDB(CSqlManager):
         Returns:
             bool: 是否成功初始化用户信息
         """
-        nowStr = g_pToolManager.dateTime().date().today().strftime("%Y-%m-%d")
+        nowStr = getToolManager().dateTime().date().today().strftime("%Y-%m-%d")
 
         result = await self.insert(
             "user",
@@ -125,7 +128,7 @@ class CUserDB(CSqlManager):
         Returns:
             bool: 是否成功更新农场名称
         """
-        safeName = g_pToolManager.sanitize_username(name)
+        safeName = getToolManager().sanitize_username(name)
 
         if safeName == "神秘农夫":
             return "error"

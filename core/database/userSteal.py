@@ -4,8 +4,11 @@ from .database import CSqlManager
 
 
 class CUserStealDB(CSqlManager):
-    @classmethod
-    async def initDB(cls):
+    def __init__(self):
+        super().__init__()
+        self.m_sTableName = "userSteal"
+
+    async def initDB(self):
         userSteal = {
             "uid": "TEXT NOT NULL",  # 被偷用户Uid
             "soilIndex": "INTEGER NOT NULL",  # 被偷的地块索引 从1开始
@@ -14,7 +17,8 @@ class CUserStealDB(CSqlManager):
             "stealTime": "INTEGER NOT NULL",  # 被偷时间
             "PRIMARY KEY": "(uid, soilIndex, stealerUid)",
         }
-        await cls.ensureTableSchema("userSteal", userSteal)
+        await self.ensureTableSchema("userSteal", userSteal)
+        self.setInitialized()
 
     @classmethod
     async def addStealRecord(
@@ -34,7 +38,7 @@ class CUserStealDB(CSqlManager):
         """
         try:
             async with cls._transaction():
-                await cls.m_pDB.execute(
+                await cls.getDB().execute(
                     'INSERT INTO "userSteal"(uid, soilIndex, stealerUid, stealCount, stealTime) VALUES(?, ?, ?, ?, ?);',
                     (uid, soilIndex, stealerUid, stealCount, stealTime),
                 )
@@ -55,7 +59,7 @@ class CUserStealDB(CSqlManager):
         """
         try:
             async with cls._transaction():
-                cursor = await cls.m_pDB.execute(
+                cursor = await cls.getDB().execute(
                     'SELECT soilIndex, stealerUid, stealCount, stealTime FROM "userSteal" WHERE uid=?;',
                     (uid,),
                 )
@@ -83,7 +87,7 @@ class CUserStealDB(CSqlManager):
         """
         try:
             async with cls._transaction():
-                cursor = await cls.m_pDB.execute(
+                cursor = await cls.getDB().execute(
                     'SELECT stealerUid, stealCount, stealTime FROM "userSteal" WHERE uid=? AND soilIndex=?;',
                     (uid, soilIndex),
                 )
@@ -115,7 +119,7 @@ class CUserStealDB(CSqlManager):
         """
         try:
             async with cls._transaction():
-                cursor = await cls.m_pDB.execute(
+                cursor = await cls.getDB().execute(
                     'SELECT SUM(stealCount) FROM "userSteal" WHERE uid=? AND soilIndex=?;',
                     (uid, soilIndex),
                 )
@@ -138,7 +142,7 @@ class CUserStealDB(CSqlManager):
         """
         try:
             async with cls._transaction():
-                cursor = await cls.m_pDB.execute(
+                cursor = await cls.getDB().execute(
                     'SELECT COUNT(DISTINCT stealerUid) FROM "userSteal" WHERE uid=? AND soilIndex=?;',
                     (uid, soilIndex),
                 )
@@ -162,7 +166,7 @@ class CUserStealDB(CSqlManager):
         """
         try:
             async with cls._transaction():
-                cursor = await cls.m_pDB.execute(
+                cursor = await cls.getDB().execute(
                     'SELECT 1 FROM "userSteal" WHERE uid=? AND soilIndex=? AND stealerUid=? LIMIT 1;',
                     (uid, soilIndex, stealerUid),
                 )
@@ -190,7 +194,7 @@ class CUserStealDB(CSqlManager):
         """
         try:
             async with cls._transaction():
-                await cls.m_pDB.execute(
+                await cls.getDB().execute(
                     'UPDATE "userSteal" SET stealCount=?, stealTime=? WHERE uid=? AND soilIndex=? AND stealerUid=?;',
                     (stealCount, stealTime, uid, soilIndex, stealerUid),
                 )
@@ -212,7 +216,7 @@ class CUserStealDB(CSqlManager):
         """
         try:
             async with cls._transaction():
-                await cls.m_pDB.execute(
+                await cls.getDB().execute(
                     'DELETE FROM "userSteal" WHERE uid=? AND soilIndex=?;',
                     (uid, soilIndex),
                 )

@@ -5,16 +5,16 @@ import random
 from zhenxun.services.log import logger
 from zhenxun.utils._build_image import BuildImage
 
-from ...utils.config import g_bIsDebug
-from ...utils.json import g_pJsonManager
-from ...utils.tool import g_pToolManager
-from ..dbService import g_pDBService
+from ...utils import config, getJsonManager, getToolManager
 from .database import CSqlManager
 
 
 class CUserSignDB(CSqlManager):
-    @classmethod
-    async def initDB(cls):
+    def __init__(self):
+        super().__init__()
+        self.m_sTableName = "userSign"
+
+    async def initDB(self):
         # userSignLog 表结构，每条为一次签到事件
         userSignLog = {
             "uid": "TEXT NOT NULL",  # 用户ID
@@ -38,8 +38,9 @@ class CUserSignDB(CSqlManager):
             "updatedAt": "DATETIME NOT NULL DEFAULT (datetime(CURRENT_TIMESTAMP, 'localtime'))",  # 更新时间  # noqa: E501
         }
 
-        await cls.ensureTableSchema("userSignLog", userSignLog)
-        await cls.ensureTableSchema("userSignSummary", userSignSummary)
+        await self.ensureTableSchema("userSignLog", userSignLog)
+        await self.ensureTableSchema("userSignSummary", userSignSummary)
+        self.setInitialized()
 
     @classmethod
     async def getUserSignRewardByDate(cls, uid: str, date: str) -> tuple[int, int]:
@@ -54,7 +55,7 @@ class CUserSignDB(CSqlManager):
         """
         try:
             async with cls._transaction():
-                async with cls.m_pDB.execute(
+                async with cls.getDB().execute(
                     "SELECT exp, point FROM userSignLog WHERE uid=? AND signDate=?",
                     (uid, date),
                 ) as cursor:
@@ -85,7 +86,7 @@ class CUserSignDB(CSqlManager):
         try:
             sql = "SELECT COUNT(*) FROM userSignLog WHERE uid=? AND signDate LIKE ?"
             param = f"{monthStr}-%"
-            async with cls.m_pDB.execute(sql, (uid, param)) as cursor:
+            async with cls.getDB().execute(sql, (uid, param)) as cursor:
                 row = await cursor.fetchone()
                 return row[0] if row else 0
         except Exception as e:
@@ -105,7 +106,7 @@ class CUserSignDB(CSqlManager):
         """
         try:
             sql = "SELECT 1 FROM userSignLog WHERE uid=? AND signDate=? LIMIT 1"
-            async with cls.m_pDB.execute(sql, (uid, signDate)) as cursor:
+            async with cls.getDB().execute(sql, (uid, signDate)) as cursor:
                 row = await cursor.fetchone()
                 return row is not None
         except Exception as e:
@@ -124,19 +125,21 @@ class CUserSignDB(CSqlManager):
             int: 0: 签到失败 1: 签到成功 2: 重复签到
         """
         try:
-            player = await g_pToolManager.getPlayerByUid(uid)
+            player = await getToolManager().getPlayerByUid(uid)
             if not player:
                 return 0
 
             if not signDate:
-                signDate = g_pToolManager.dateTime().date().today().strftime("%Y-%m-%d")
+                signDate = (
+                    getToolManager().dateTime().date().today().strftime("%Y-%m-%d")
+                )
 
             if await cls.hasSigned(uid, signDate):
                 return 2
 
-            todayStr = g_pToolManager.dateTime().date().today().strftime("%Y-%m-%d")
+            todayStr = getToolManager().dateTime().date().today().strftime("%Y-%m-%d")
             isSupplement = 0 if signDate == todayStr else 1
-            sign = await g_pJsonManager.getSign()
+            sign = await getJsonManager().getSign()
 
             expMax, expMin, pointMax, pointMin = [
                 sign.get(key, default)
@@ -153,12 +156,12 @@ class CUserSignDB(CSqlManager):
             vipPoint = 0
 
             async with cls._transaction():
-                await cls.m_pDB.execute(
+                await cls.getDB().execute(
                     "INSERT INTO userSignLog (uid, signDate, isSupplement, exp, point) VALUES (?, ?, ?, ?, ?)",
                     (uid, signDate, isSupplement, exp, point),
                 )
 
-                cursor = await cls.m_pDB.execute(
+                cursor = await cls.getDB().execute(
                     "SELECT * FROM userSignSummary WHERE uid=?", (uid,)
                 )
                 row = await cursor.fetchone()
@@ -171,7 +174,7 @@ class CUserSignDB(CSqlManager):
                         else 1
                     )
                     prevDate = (
-                        g_pToolManager.dateTime().strptime(signDate, "%Y-%m-%d")
+                        getToolManager().dateTime().strptime(signDate, "%Y-%m-%d")
                         - timedelta(days=1)
                     ).strftime("%Y-%m-%d")
                     continuousDays = (
@@ -184,7 +187,7 @@ class CUserSignDB(CSqlManager):
                         if isSupplement
                         else row["supplementCount"]
                     )
-                    await cls.m_pDB.execute(
+                    await cls.getDB().execute(
                         """
                         UPDATE userSignSummary
                         SET totalSignDays=totalSignDays+1,
@@ -206,7 +209,7 @@ class CUserSignDB(CSqlManager):
                     )
                 else:
                     monthSignDays = 1
-                    await cls.m_pDB.execute(
+                    await cls.getDB().execute(
                         """
                         INSERT INTO userSignSummary
                         (uid, totalSignDays, currentMonth, monthSignDays, lastSignDate, continuousDays, supplementCount)
@@ -233,9 +236,9 @@ class CUserSignDB(CSqlManager):
                 plant = reward.get("plant", {})
                 if plant:
                     for key, value in plant.items():
-                        await g_pDBService.userSeed.addUserSeedByUid(uid, key, value)
+                        await cls.getUserSeedManager().addUserSeedByUid(uid, key, value)
 
-            if g_bIsDebug:
+            if config.g_bIsDebug:
                 exp += 9999
 
             # 向数据库更新
@@ -268,7 +271,7 @@ class CUserSignDB(CSqlManager):
         monthStr = f"{year:04d}-{month:02d}"
         try:
             sql = "SELECT signDate FROM userSignLog WHERE uid=? AND signDate LIKE ?"
-            async with cls.m_pDB.execute(sql, (uid, f"{monthStr}-%")) as cursor:
+            async with cls.getDB().execute(sql, (uid, f"{monthStr}-%")) as cursor:
                 rows = await cursor.fetchall()
                 signedDays = {int(r[0][-2:]) for r in rows if r[0][-2:].isdigit()}
         except Exception as e:

@@ -3,15 +3,16 @@ import re
 
 from zhenxun.services.log import logger
 
-from ...utils.config import g_bIsDebug
-from ...utils.tool import g_pToolManager
-from ..dbService import g_pDBService
+from ...utils import config, getToolManager
 from .database import CSqlManager
 
 
 class CUserSoilDB(CSqlManager):
-    @classmethod
-    async def initDB(cls):
+    def __init__(self):
+        super().__init__()
+        self.m_sTableName = "userSoil"
+
+    async def initDB(self):
         userSoil = {
             "uid": "TEXT NOT NULL",
             "soilIndex": "INTEGER NOT NULL",  # 地块索引从1开始
@@ -29,7 +30,8 @@ class CUserSoilDB(CSqlManager):
             "PRIMARY KEY": "(uid, soilIndex)",
         }
 
-        await cls.ensureTableSchema("userSoil", userSoil)
+        await self.ensureTableSchema("userSoil", userSoil)
+        self.setInitialized()
 
     @classmethod
     async def nextPhase(cls, uid: str, soilIndex: int):
@@ -38,7 +40,7 @@ class CUserSoilDB(CSqlManager):
         Args:
             soilIndex (int): 地块索引 从1开始
         """
-        if not g_bIsDebug:
+        if not config.g_bIsDebug:
             return
 
         soilInfo = await cls.getUserSoil(uid, soilIndex)
@@ -46,13 +48,15 @@ class CUserSoilDB(CSqlManager):
         if not soilInfo:
             return
 
-        plantInfo = await g_pDBService.plant.getPlantByName(soilInfo["plantName"])
+        plantInfo = await cls.getPlantManager().getPlantByName(soilInfo["plantName"])
 
         if not plantInfo:
             return
 
-        currentTime = g_pToolManager.dateTime().now().timestamp()
-        phaseList = await g_pDBService.plant.getPlantPhaseByName(soilInfo["plantName"])
+        currentTime = getToolManager().dateTime().now().timestamp()
+        phaseList = await cls.getPlantManager().getPlantPhaseByName(
+            soilInfo["plantName"]
+        )
 
         if currentTime >= soilInfo["matureTime"]:
             return
@@ -88,11 +92,11 @@ class CUserSoilDB(CSqlManager):
         if not plantName:
             return
 
-        plantInfo = await g_pDBService.plant.getPlantByName(plantName)
+        plantInfo = await cls.getPlantManager().getPlantByName(plantName)
         if not plantInfo:
             return
 
-        currentTime = int(g_pToolManager.dateTime().now().timestamp())
+        currentTime = int(getToolManager().dateTime().now().timestamp())
         # 如果当前时间已经超过或等于成熟时间，则作物已成熟或可收获
         if currentTime >= soilInfo["matureTime"]:
             return
@@ -110,7 +114,7 @@ class CUserSoilDB(CSqlManager):
         Returns:
             dict: 包含字段名-值的字典; 若无数据则返回空字典
         """
-        cursor = await cls.m_pDB.execute("SELECT * FROM soil WHERE uid = ?", (uid,))
+        cursor = await cls.getDB().execute("SELECT * FROM soil WHERE uid = ?", (uid,))
         row = await cursor.fetchone()
 
         if not row:
@@ -129,7 +133,7 @@ class CUserSoilDB(CSqlManager):
             None
         """
         async with cls._transaction():
-            await cls.m_pDB.execute(
+            await cls.getDB().execute(
                 """
                 INSERT INTO userSoil
                   (uid, soilIndex, plantName, plantTime, matureTime,
@@ -164,7 +168,7 @@ class CUserSoilDB(CSqlManager):
         Returns:
             None
         """
-        await cls.m_pDB.execute(
+        await cls.getDB().execute(
             """
                 INSERT INTO userSoil
                   (uid, soilIndex, plantName, plantTime, matureTime,
@@ -201,7 +205,7 @@ class CUserSoilDB(CSqlManager):
             dict: 记录存在返回字段-值字典，否则返回 None
         """
         async with cls._transaction():
-            cursor = await cls.m_pDB.execute(
+            cursor = await cls.getDB().execute(
                 "SELECT * FROM userSoil WHERE uid = ? AND soilIndex = ?",
                 (uid, soilIndex),
             )
@@ -222,7 +226,7 @@ class CUserSoilDB(CSqlManager):
         Returns:
             dict | None: 记录存在返回字段-值字典，否则返回 None
         """
-        cursor = await cls.m_pDB.execute(
+        cursor = await cls.getDB().execute(
             "SELECT * FROM userSoil WHERE uid = ? AND soilIndex = ?",
             (uid, soilIndex),
         )
@@ -244,7 +248,7 @@ class CUserSoilDB(CSqlManager):
             int: 符合条件的土地数量
         """
         async with cls._transaction():
-            cursor = await cls.m_pDB.execute(
+            cursor = await cls.getDB().execute(
                 "SELECT COUNT(*) FROM userSoil WHERE uid = ? AND soilLevel = ?",
                 (uid, soilLevel),
             )
@@ -265,7 +269,7 @@ class CUserSoilDB(CSqlManager):
             None
         """
         async with cls._transaction():
-            await cls.m_pDB.execute(
+            await cls.getDB().execute(
                 f"UPDATE userSoil SET {field} = ? WHERE uid = ? AND soilIndex = ?",
                 (value, uid, soilIndex),
             )
@@ -283,7 +287,7 @@ class CUserSoilDB(CSqlManager):
         Returns:
             None
         """
-        await cls.m_pDB.execute(
+        await cls.getDB().execute(
             f"UPDATE userSoil SET {field} = ? WHERE uid = ? AND soilIndex = ?",
             (value, uid, soilIndex),
         )
@@ -331,7 +335,7 @@ class CUserSoilDB(CSqlManager):
 
         try:
             async with cls._transaction():
-                await cls.m_pDB.execute(sql, tuple(values))
+                await cls.getDB().execute(sql, tuple(values))
             return True
         except Exception as e:
             logger.error(f"批量更新土地字段失败: {e}")
@@ -349,7 +353,7 @@ class CUserSoilDB(CSqlManager):
             None
         """
         async with cls._transaction():
-            await cls.m_pDB.execute(
+            await cls.getDB().execute(
                 "DELETE FROM userSoil WHERE uid = ? AND soilIndex = ?", (uid, soilIndex)
             )
 
@@ -364,7 +368,7 @@ class CUserSoilDB(CSqlManager):
         Returns:
             None
         """
-        await cls.m_pDB.execute(
+        await cls.getDB().execute(
             "DELETE FROM userSoil WHERE uid = ? AND soilIndex = ?", (uid, soilIndex)
         )
 
@@ -386,12 +390,12 @@ class CUserSoilDB(CSqlManager):
             return False
 
         # 获取植物配置"""  """
-        plantCfg = await g_pDBService.plant.getPlantByName(plantName)
+        plantCfg = await cls.getPlantManager().getPlantByName(plantName)
         if not plantCfg:
             logger.error(f"未知植物: {plantName}")
             return False
 
-        nowTs = int(g_pToolManager.dateTime().now().timestamp())
+        nowTs = int(getToolManager().dateTime().now().timestamp())
 
         time = int(plantCfg.get("time", 0))
         percent = await cls.getSoilLevelTime(soilInfo.get("soilLevel", 0))
@@ -413,11 +417,9 @@ class CUserSoilDB(CSqlManager):
                     base_name = plantName[len(m.group(0)) :]
 
                 # 只有当存在一星升级配置时才尝试按收获次数升级
-                if await g_pDBService.plant.existsPlant("一星" + base_name):
-                    harvestCounts = (
-                        await g_pDBService.userPlantCount.getUserPlantCountByPlantName(
-                            uid, base_name
-                        )
+                if await cls.getPlantManager().existsPlant("一星" + base_name):
+                    harvestCounts = await cls.getUserPlantCountManager().getUserPlantCountByPlantName(
+                        uid, base_name
                     )
                     # 根据阈值设定最高星级（避免重复拼接）
                     prefix = ""
@@ -455,7 +457,7 @@ class CUserSoilDB(CSqlManager):
     @classmethod
     async def getUserSoilStatus(cls, uid: str, soilIndex: int) -> str:
         status = []
-        soilInfo = await g_pDBService.userSoil.getUserSoil(uid, soilIndex)
+        soilInfo = await cls.getUserSoilManager().getUserSoil(uid, soilIndex)
 
         if not soilInfo:
             return ""
