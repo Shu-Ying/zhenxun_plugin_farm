@@ -58,6 +58,13 @@ __plugin_meta__ = PluginMetadata(
                 default_value="low",
             ),
             RegisterConfig(
+                key="动态背景",
+                value=True,
+                help="是否开启根据季节和节日变化的动态背景",
+                type=bool,
+                default_value=True,
+            ),
+            RegisterConfig(
                 key="签到图片样式",
                 value="text",
                 help="签到图片的样式, [text, html]",

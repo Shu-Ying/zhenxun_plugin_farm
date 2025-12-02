@@ -1,3 +1,6 @@
+from . import utils
+
+
 def getConfig():
     from . import config
 
@@ -34,4 +37,5 @@ __all__ = [
     "getJsonManager",
     "getRequestManager",
     "getToolManager",
+    "utils",
 ]

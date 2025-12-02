@@ -35,10 +35,10 @@ class CSqlManager(ABC):
             if cls.m_pDB is None:
                 cls.m_pDB = await aiosqlite.connect(config.g_sDBFilePath)
                 cls.m_pDB.row_factory = aiosqlite.Row
-                logger.info("真寻农场数据库连接初始化成功")
+                logger.debug("真寻农场数据库连接初始化成功")
                 return True
             else:
-                logger.info("真寻农场数据库连接已存在，跳过初始化")
+                logger.debug("真寻农场数据库连接已存在，跳过初始化")
                 return True
         except Exception as e:
             logger.error(f"真寻农场数据库连接初始化失败: {e}")
@@ -46,10 +46,33 @@ class CSqlManager(ABC):
 
     @classmethod
     async def cleanup(cls):
-        if cls.m_pDB:
-            await cls.m_pDB.close()
+        try:
+            if not cls.isConnectionValid():
+                logger.warning("真寻农场数据库连接已关闭或无效，跳过清理")
+                return
+
+            if hasattr(cls, "m_pDB") and cls.m_pDB:
+                await cls.m_pDB.close()
+                cls.m_pDB = None
+                cls._initialized = False
+                logger.debug("真寻农场数据库连接已安全关闭")
+            else:
+                logger.debug("真寻农场数据库连接已不存在，无需关闭")
+
+        except Exception as e:
+            logger.error(f"真寻农场数据库清理过程中出错: {e}")
             cls.m_pDB = None
-            logger.info("真寻农场数据库连接已关闭")
+            cls._initialized = False
+
+    @classmethod
+    def isConnectionValid(cls) -> bool:
+        if not hasattr(cls, "m_pDB") or cls.m_pDB is None:
+            return False
+
+        try:
+            return hasattr(cls.m_pDB, "_conn") and cls.m_pDB._conn is not None
+        except:
+            return False
 
     @classmethod
     def getDB(cls) -> aiosqlite.Connection:

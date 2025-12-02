@@ -4,8 +4,9 @@ from zhenxun.utils._build_image import BuildImage
 from zhenxun.utils.image_utils import ImageTemplate
 from zhenxun.utils.platform import PlatformUtils
 
+from ...core import CPlayer
 from ...core.dbService import g_pDBService
-from .. import config, getJsonManager, getToolManager
+from .. import config, getJsonManager, getToolManager, utils
 
 
 class CDarwFarm:
@@ -19,7 +20,9 @@ class CDarwFarm:
         Returns:
             bytes: 返回绘制结果
         """
-        img, soilSize, soilPos, grass = await cls.createBaseCanvas()
+        dynamic = Config.get_config("zhenxun_plugin_farm", "动态背景")
+
+        img, soilSize, soilPos, grass = await cls.createBaseCanvas(dynamic)
 
         player = await getToolManager().getPlayerByUid(uid)
         if not player:
@@ -48,20 +51,44 @@ class CDarwFarm:
                     isFirstExpansion = False
 
         await cls.drawUserInfo(img, player, uid)
+
         await cls.applyDefinitionResize(img)
 
         return img.pic2bytes()
 
     @classmethod
-    async def createBaseCanvas(cls) -> tuple[BuildImage, tuple, dict, BuildImage]:
+    async def createBaseCanvas(
+        cls, dynamic: bool
+    ) -> tuple[BuildImage, tuple, dict, BuildImage]:
         """创建基础画布并返回 (img, soilSize, soilPos, grass)
 
         Returns:
             tuple: (主画布, 土地尺寸, 土地坐标映射, 草地图)
         """
-        img = BuildImage(
-            background=config.g_sResourcePath / "background/background.jpg"
-        )
+
+        if dynamic:
+            season = getToolManager().getSeason()
+
+            backgroundPath = config.g_sResourcePath / "background/decorateIcon"
+
+            # 节日优先级更高
+            if season == utils.Season.SPRING:
+                bgFile = backgroundPath / "decorate_spring_1.jpg"
+            elif season == utils.Season.SUMMER:
+                bgFile = backgroundPath / "decorate_summer_1.jpg"
+            elif season == utils.Season.AUTUMN:
+                bgFile = backgroundPath / "decorate_autumn_1.jpg"
+            elif season == utils.Season.WINTER:
+                bgFile = backgroundPath / "decorate_winter_1.jpg"
+            else:
+                bgFile = backgroundPath / "decorate_default_1.jpg"
+
+            img = BuildImage(background=bgFile)
+        else:
+            img = BuildImage(
+                background=config.g_sResourcePath
+                / "background/decorateIcon/decorate_default_1jpg"
+            )
 
         soil = await getJsonManager().getSoil()
         soilSize = soil["size"]
@@ -76,17 +103,17 @@ class CDarwFarm:
     async def drawUnlockedTile(
         cls, img: BuildImage, uid: str, soilIndex: int, x: int, y: int, soilSize
     ) -> bool:
-        """绘制已解锁土地格（包含土地贴图与作物），返回该格是否可收获。
+        """绘制已解锁土地格（包含土地贴图与作物），返回该格是否可收获
 
         Args:
-            img (BuildImage): 主画布。
-            uid (str): 用户UID。
-            soilIndex (int): 土地索引（从1开始）。
-            x (int), y (int): 贴图位置。
-            soilSize: 土地贴图尺寸（[w,h] 或 (w,h)）。
+            img (BuildImage): 主画布
+            uid (str): 用户UID
+            soilIndex (int): 土地索引（从1开始）
+            x (int), y (int): 贴图位置
+            soilSize: 土地贴图尺寸（[w,h] 或 (w,h)）
 
         Returns:
-            bool: 是否有可收获作物（isRipe）。
+            bool: 是否有可收获作物（isRipe）
         """
         soilUrl = "soil/普通土地.png"
         soilInfo = await g_pDBService.userSoil.getUserSoil(uid, soilIndex)
@@ -128,10 +155,10 @@ class CDarwFarm:
         grass: BuildImage,
         isFirstExpansion: bool,
     ) -> bool:
-        """绘制未解锁格子并在首次出现时绘制扩建图标。
+        """绘制未解锁格子并在首次出现时绘制扩建图标
 
         Returns:
-            bool: 是否在此格绘制了扩建图标（仅首次返回 True）。
+            bool: 是否在此格绘制了扩建图标（仅首次返回 True）
         """
         await img.paste(grass, (x, y))
 
@@ -153,7 +180,7 @@ class CDarwFarm:
 
     @classmethod
     async def pasteRipeOnce(cls, img: BuildImage, x: int, y: int, soilSize):
-        """首次发现成熟作物时贴上成熟提示图（ripe）。"""
+        """首次发现成熟作物时贴上成熟提示图（ripe）"""
         ripe = BuildImage(background=config.g_sResourcePath / "background/ripe.png")
         await img.paste(
             ripe,
@@ -161,22 +188,32 @@ class CDarwFarm:
         )
 
     @classmethod
-    async def drawUserInfo(cls, img: BuildImage, player, uid: str):
-        """绘制左上角用户信息（头像、框、昵称、经验、等级、货币等）。
+    async def drawUserInfo(cls, img: BuildImage, player: CPlayer, uid: str):
+        """绘制左上角用户信息（头像、框、昵称、经验、等级、货币等）
         TODO 需要详细的绘制头像框
 
         Args:
-            img (BuildImage): 主画布。
-            player: 用户对象（包含 user 字段）。
-            uid (str): 用户UID。
+            img (BuildImage): 主画布
+            player(CPlayer): 用户
+            uid (str): 用户Uid
         """
+        # 背景板
+        background = BuildImage(
+            background=config.g_sResourcePath / "background/userInfo.png"
+        )
+        await img.paste(background, (150, 30))
+
+        # 头像
         image = await PlatformUtils.get_user_avatar(uid, "qq")
         if image:
             avatar = BuildImage(background=image)
             await avatar.resize(0, 140, 150)
             await img.paste(avatar, (125, 85))
 
-        frame = BuildImage(background=config.g_sResourcePath / "background/frame.png")
+        # 头像框
+        frame = BuildImage(
+            background=config.g_sResourcePath / "background/frame/frame.png"
+        )
         await img.paste(frame, (75, 44))
 
         nameImg = await BuildImage.build_text_image(
@@ -215,8 +252,36 @@ class CDarwFarm:
         await img.paste(bondsImg, (570, 255))
 
     @classmethod
+    async def drawUserDecorateIcon(cls, img: BuildImage, player: CPlayer) -> bool:
+        """绘制用户装饰图标
+
+        Args:
+            img (BuildImage): 主画布
+            player (CPlayer): 用户
+
+        Returns:
+            bool: 是否成功绘制
+        """
+
+        decorateIconId = player.user.get("decorateIcon", 0)
+        if decorateIconId <= 0:
+            return False
+
+        iconPath = (
+            config.g_sResourcePath / f"decorateIcon/DecorateIcon{decorateIconId}.png"
+        )
+        if not iconPath.exists():
+            return False
+
+        icon = BuildImage(background=iconPath)
+        await icon.resize(0, 100, 100)
+        await img.paste(icon, (x, y))
+
+        return True
+
+    @classmethod
     async def applyDefinitionResize(cls, img: BuildImage):
-        """根据配置调整绘制清晰度（original/medium/hight/其他）。"""
+        """根据配置调整绘制清晰度（original/medium/hight/其他）"""
         definition = Config.get_config("zhenxun_plugin_farm", "绘制农场清晰度")
         if definition == "medium":
             await img.resize(0.6)

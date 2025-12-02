@@ -5,11 +5,13 @@ from zoneinfo import ZoneInfo
 
 from jinja2 import Template
 from playwright.async_api import async_playwright
+from zhdate import ZhDate
 
 from zhenxun.services.log import logger
 from zhenxun.utils.message import MessageUtils
 
 from ..core import CPlayer, g_pUserPool
+from . import utils
 
 
 class CToolManager:
@@ -109,6 +111,47 @@ class CToolManager:
     def dateTime(cls) -> datetime:
         tz = ZoneInfo("Asia/Shanghai")
         return datetime.now(tz)
+
+    @classmethod
+    def getSeason(cls) -> utils.Season:
+        month = cls.dateTime().month
+
+        if month in [3, 4, 5]:
+            return utils.Season.SPRING
+        elif month in [6, 7, 8]:
+            return utils.Season.SUMMER
+        elif month in [9, 10, 11]:
+            return utils.Season.AUTUMN
+        elif month in [12, 1, 2]:
+            return utils.Season.WINTER
+        else:
+            return utils.Season.NO
+
+    @classmethod
+    def getFestival(cls) -> utils.Festival:
+        now = cls.dateTime()
+
+        lunarDate = ZhDate.from_datetime(now)
+        lunarMonth = lunarDate.lunar_month
+        lunarDay = lunarDate.lunar_day
+
+        festivalChecks = [
+            (1, lambda: lunarMonth == 8 and lunarDay == 15),  # 中秋节
+            (2, lambda: (now.month, now.day) == (10, 1)),  # 国庆节
+            (3, lambda: lunarMonth == 1 and lunarDay == 15),  # 元宵节
+            (4, lambda: lunarMonth == 5 and lunarDay == 5),  # 端午节
+            (5, lambda: lunarMonth == 1 and lunarDay == 1),  # 春节
+            (6, lambda: (now.month, now.day) == (10, 31)),  # 万圣节
+            (7, lambda: (now.month, now.day) == (12, 25)),  # 圣诞节
+            (8, lambda: (now.month, now.day) == (1, 1)),  # 新年
+            (9, lambda: (now.month, now.day) == (2, 14)),  # 情人节
+        ]
+
+        for code, checkFunc in festivalChecks:
+            if checkFunc():
+                return utils.Festival(code)
+
+        return utils.Festival.NO
 
     @classmethod
     def renderHtmlToFile(
