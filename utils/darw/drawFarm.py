@@ -201,7 +201,7 @@ class CDarwFarm:
         background = BuildImage(
             background=config.g_sResourcePath / "background/userInfo.png"
         )
-        await img.paste(background, (150, 30))
+        await img.paste(background, (100, 30))
 
         # 头像
         image = await PlatformUtils.get_user_avatar(uid, "qq")

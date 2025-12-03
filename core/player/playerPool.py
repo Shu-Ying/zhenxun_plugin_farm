@@ -29,10 +29,6 @@ class CPlayerPool:
         self._running = True
         self._cleanupThread.start()
 
-        logger.debug(
-            f"用户池初始化完成，超时时间: {timeoutSeconds}秒, 清理间隔: {cleanupInterval}秒"
-        )
-
     def createUser(self, uid: str, userObj: Any) -> bool:
         """
         创建并管理用户对象
