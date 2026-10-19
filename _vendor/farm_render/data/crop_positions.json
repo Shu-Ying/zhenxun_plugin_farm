@@ -1,0 +1,9 @@
+{
+  "schema": 2,
+  "mode": "full_canvas_bottom_center",
+  "reference_soil_height": 79.5,
+  "growth_scale": 0.75,
+  "common_scale": 0.5,
+  "wither_down": 8,
+  "basis": "WebGLMainSceneLandController.SetCropTexture and mainscene RectTransform"
+}

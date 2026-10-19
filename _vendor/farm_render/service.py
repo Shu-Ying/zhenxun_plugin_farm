@@ -1,0 +1,89 @@
+"""异步入口：一次快照、有限任务、共享绘制与关闭排空。"""
+
+import asyncio
+import logging
+from time import perf_counter
+import time
+
+logger = logging.getLogger(__name__)
+
+
+class RenderService:
+    def __init__(self, renderer, concurrency=1, max_pending=8):
+        if (type(concurrency) is not int or type(max_pending) is not int
+                or concurrency < 1 or max_pending < concurrency):
+            raise ValueError("Invalid render capacity")
+        self.renderer = renderer
+        self._semaphore = asyncio.Semaphore(concurrency)
+        self._max_pending = max_pending
+        self._pending = {}
+        self._closed = False
+
+    async def my_farm(
+        self, source, identity, *, now=None, options=None, avatar=None,
+        supported=("JPEG",),
+    ):
+        if self._closed:
+            raise RuntimeError("Render service closed")
+        started = perf_counter()
+        snapshot = await source.snapshot(identity)
+        logger.info("farm render query_ms=%.2f", (perf_counter()-started)*1000)
+        return await self.render(
+            identity, snapshot, int(time.time()) if now is None else now,
+            options, avatar, supported,
+        )
+
+    async def render(
+        self, identity, snapshot, now, options=None, avatar=None,
+        supported=("JPEG",),
+    ):
+        if self._closed:
+            raise RuntimeError("Render service closed")
+        key = self.renderer.request_key(
+            identity, snapshot, now, options, avatar, supported,
+        )
+        task = self._pending.get(key)
+        if task is None:
+            if len(self._pending) >= self._max_pending:
+                raise RuntimeError("Render queue full")
+            task = asyncio.create_task(self._run(
+                identity, snapshot, now, options, avatar, supported,
+            ))
+            self._pending[key] = task
+
+            def finished(done):
+                self._pending.pop(key, None)
+                if not done.cancelled():
+                    done.exception()
+
+            task.add_done_callback(finished)
+        return await asyncio.shield(task)
+
+    async def _run(self, *args):
+        started = perf_counter()
+        async with self._semaphore:
+            logger.info(
+                "farm render queue_ms=%.2f", (perf_counter()-started)*1000,
+            )
+            worker = asyncio.create_task(asyncio.to_thread(
+                self.renderer.render, *args,
+            ))
+            try:
+                return await asyncio.shield(worker)
+            except asyncio.CancelledError:
+                await worker
+                raise
+
+    async def close(self):
+        self._closed = True
+        pending = tuple(self._pending.values())
+        if pending:
+            await asyncio.shield(asyncio.gather(
+                *pending, return_exceptions=True,
+            ))
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *exc):
+        await self.close()
