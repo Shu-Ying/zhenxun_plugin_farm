@@ -44,12 +44,13 @@
   - [关于](#关于)
   - [致谢](#致谢)
   - [许可证](#许可证)
+  - [上游仓库](#上游仓库)
 
 ---
 
 ## 农场界面
 
-![农场界面](./resource/1.png)
+![农场界面](./images/farm-preview.png)
 
 ---
 
@@ -124,6 +125,7 @@
 
 最后感谢以下框架/作者的提供的技术支持(排名不分先后):
 
+- [QQ农场](https://qqnc.qq.com/) * 绝大多数的素材来源 *
 - [Nonebot2](https://github.com/nonebot/nonebot2) *✨ 跨平台 Python 异步机器人框架 ✨*
 - [zhenxun_bot](https://github.com/zhenxun-org/zhenxun_bot) *最爱真寻的一集*
 - [HibiKier](https://github.com/HibiKier) *阿咪为什么是神*
@@ -132,3 +134,7 @@
 ## 许可证
 
 `真寻农场(zhenxun_plugin_farm)`将采用的是`GPLv3`许可证进行开源
+
+## 上游仓库
+
+- [Client](https://github.com/Shu-Ying/main_plugin_farm)

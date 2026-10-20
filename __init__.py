@@ -1,114 +1,20 @@
-from nonebot import get_driver
+"""真寻农场独立预览插件入口。"""
+
 from nonebot.plugin import PluginMetadata
-from nonebot_plugin_apscheduler import scheduler
+from zhenxun.configs.utils import Command, PluginExtraData
 
-from zhenxun.configs.utils import Command, PluginExtraData, RegisterConfig
-from zhenxun.services.log import logger
-from zhenxun.utils.message import MessageUtils
-
-from .command import diuse_farm, diuse_register, reclamation
-from .database.database import g_pSqlManager
-from .dbService import g_pDBService
-from .event.event import g_pEventManager
-from .farm.farm import g_pFarmManager
-from .farm.shop import g_pShopManager
-from .json import g_pJsonManager
-from .request import g_pRequestManager
+from ._version import __version__
+from .runtime import COMMANDS, HELP
 
 __plugin_meta__ = PluginMetadata(
-    name="真寻农场",
-    description="快乐的农场时光",
-    usage="""
-    你也要种地?
-    指令：
-        at 开通农场
-        我的农场
-        农场详述
-        我的农场币
-        种子商店 [筛选关键字] [页数] or [页数]
-        购买种子 [作物/种子名称] [数量]
-        我的种子
-        播种 [作物/种子名称] [数量] (数量不填默认将最大可能播种
-        收获
-        铲除
-        我的作物
-        出售作物 [作物/种子名称] [数量] (不填写作物名将售卖仓库种全部作物 填作物名不填数量将指定作物全部出售
-        偷菜 at (每人每天只能偷5次
-        开垦
-        购买农场币 [数量] 数量为消耗金币的数量
-        更改农场名 [新农场名]
-        农场签到
-        土地升级 [地块ID]（通过农场详述获取）
-    """.strip(),
+    name="真寻农场", description="快乐的农场时光",
+    usage=HELP, type="application",
+    homepage="https://github.com/Shu-Ying/zhenxun_plugin_farm",
+    supported_adapters={"~onebot.v11", "~qq"},
     extra=PluginExtraData(
-        author="Art_Sakura",
-        version="1.5.2",
-        commands=[Command(command="我的农场")],
-        menu_type="群内小游戏",
-        configs=[
-            RegisterConfig(
-                key="绘制农场清晰度",
-                value="low",
-                help="我的农场返回图片的清晰度, [low, medium, hight, original]",
-                default_value="low",
-            ),
-            RegisterConfig(
-                key="兑换倍数",
-                value="2",
-                help="金币兑换农场币的倍数 默认值为: 2倍",
-                default_value="2",
-            ),
-            RegisterConfig(
-                key="点券兑换倍数",
-                value="2000",
-                help="农场币兑换点券的倍数 比例为2000:1",
-                default_value="2000",
-            ),
-            RegisterConfig(
-                key="手续费",
-                value="0.2",
-                help="金币兑换农场币的手续费 默认值为: 0.2 实际意义为20%手续费",
-                default_value="0.2",
-            ),
-            RegisterConfig(
-                key="服务地址",
-                value="http://diuse.work",
-                help="签到、交易行、活动等服务器地址",
-                default_value="http://diuse.work",
-            ),
-        ],
+        author="Shu-Ying", version=__version__, menu_type="群内小游戏",
+        commands=[Command(command=name) for name in COMMANDS],
     ).to_dict(),
 )
-driver = get_driver()
 
-
-# 构造函数
-@driver.on_startup
-async def start():
-    # 初始化数据库
-    await g_pSqlManager.init()
-
-    # 初始化读取Json
-    await g_pJsonManager.init()
-
-    await g_pDBService.init()
-
-    # 检查作物文件是否缺失 or 更新
-    await g_pRequestManager.initPlantDBFile()
-
-
-# 析构函数
-@driver.on_shutdown
-async def shutdown():
-    await g_pSqlManager.cleanup()
-
-    await g_pDBService.cleanup()
-
-
-@scheduler.scheduled_job(trigger="cron", hour=4, minute=30, id="signInFile")
-async def signInFile():
-    try:
-        await g_pJsonManager.initSignInFile()
-        await g_pRequestManager.initPlantDBFile()
-    except Exception as e:
-        logger.error("农场定时检查出错", e=e)
+from . import commands
