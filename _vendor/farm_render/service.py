@@ -4,6 +4,9 @@ import asyncio
 import logging
 from time import perf_counter
 import time
+import hashlib
+
+from .shop import render_shop
 
 logger = logging.getLogger(__name__)
 
@@ -60,13 +63,39 @@ class RenderService:
         return await asyncio.shield(task)
 
     async def _run(self, *args):
+        return await self._run_function(self.renderer.render, *args)
+
+    async def seed_shop(self, plants, account, page, pages):
+        if self._closed:
+            raise RuntimeError('Render service closed')
+        key = 'shop:' + hashlib.sha256(
+            repr((plants, account, page, pages)).encode(),
+        ).hexdigest()
+        task = self._pending.get(key)
+        if task is None:
+            if len(self._pending) >= self._max_pending:
+                raise RuntimeError('Render queue full')
+            task = asyncio.create_task(self._run_function(
+                render_shop, self.renderer, plants, account, page, pages,
+            ))
+            self._pending[key] = task
+
+            def finished(done):
+                self._pending.pop(key, None)
+                if not done.cancelled():
+                    done.exception()
+
+            task.add_done_callback(finished)
+        return await asyncio.shield(task)
+
+    async def _run_function(self, function, *args):
         started = perf_counter()
         async with self._semaphore:
             logger.info(
                 "farm render queue_ms=%.2f", (perf_counter()-started)*1000,
             )
             worker = asyncio.create_task(asyncio.to_thread(
-                self.renderer.render, *args,
+                function, *args,
             ))
             try:
                 return await asyncio.shield(worker)

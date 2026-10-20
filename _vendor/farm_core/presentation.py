@@ -19,6 +19,8 @@ def receipt_text(receipt: Receipt) -> str:
         lines.append(f"实际数量：{data['quantity']}")
     if "proceeds" in data:
         lines.append(f"本次收入：{data['proceeds']}")
+    if "experience" in data:
+        lines.append(f"本次经验：+{data['experience']}")
     for item in data.get("harvested", ()):
         if item.get("yield_loss_percent", 0):
             lines.append(

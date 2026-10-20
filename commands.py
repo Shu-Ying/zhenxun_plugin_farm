@@ -15,17 +15,30 @@ from zhenxun.utils.message import MessageUtils
 from zhenxun.utils.platform import PlatformUtils
 
 from .runtime import COMMANDS, Runtime
+from .data_paths import data_directories
+from .config_migration import migrate_config
 
 logger = logging.getLogger(__name__)
 driver = get_driver()
+data_dir, legacy_data_dir = data_directories(
+    DATA_PATH, getattr(driver.config, 'farm_preview_data_dir', None),
+)
 runtime = Runtime(
-    getattr(driver.config, "farm_preview_data_dir", DATA_PATH / "farm_preview"),
+    data_dir,
     getattr(driver.config, "farm_preview_font", None),
     getattr(driver.config, "farm_preview_deployment", "zhenxun-preview"),
     str(getattr(driver.config, "farm_preview_image_format", "AUTO")).upper(),
     font_dir=FONT_PATH,
+    legacy_data_dir=legacy_data_dir,
 )
-driver.on_startup(runtime.start)
+async def start_runtime():
+    from zhenxun.configs.config import Config
+
+    migrate_config(Config, __package__.split(".")[-1])
+    await runtime.start()
+
+
+driver.on_startup(start_runtime)
 driver.on_shutdown(runtime.close)
 _avatars = {}
 

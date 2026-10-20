@@ -12,6 +12,8 @@ from ._vendor.farm_core.storage import SCHEMA_VERSION
 from ._vendor.farm_core.presentation import receipt_text, snapshot_text
 from ._vendor.farm_render import FarmRenderer, RenderOptions, RenderService
 from ._vendor.farm_render.seasons import season_for
+from ._vendor.farm_render.shop import shop_page
+from .data_paths import prepare_directory
 
 logger = logging.getLogger(__name__)
 COMMANDS = {
@@ -29,6 +31,8 @@ HELP = (
     "收获｜铲除｜农场除虫｜我的种子｜我的作物\n"
     "作物加锁 作物｜作物解锁 作物｜出售作物 [作物] [数量]\n"
     "作物可填写名称或 #编号；同名作物请使用商店或仓库中的编号。\n"
+    "每成功播种1块地获得2经验；收获经验按作物结算。\n"
+    "每铲除1块枯萎地块获得2经验；每清除1只虫获得1经验。\n"
     "每只虫使生长速度降低5%；成熟时每只虫使本季减产5%。\n"
     "成熟后除虫不能恢复本季减产；生长期间可发送：农场除虫。\n"
     "我的农场按北京时间自动切换春夏秋冬背景；高清使用相同季节。\n"
@@ -65,8 +69,9 @@ def operation_id(bot_id, platform, user_id, message_id, action):
 
 class Runtime:
     def __init__(self, data_dir, font_path=None, deployment="zhenxun-preview",
-                 image_format="AUTO", *, font_dir=None):
+                 image_format="AUTO", *, font_dir=None, legacy_data_dir=None):
         self.data_dir = Path(data_dir).resolve()
+        self.legacy_data_dir = legacy_data_dir
         self.font_path = font_path
         self.font_dir = Path(font_dir or "resources/font")
         self.deployment = deployment
@@ -80,7 +85,7 @@ class Runtime:
     async def start(self):
         if self.started:
             return
-        self.data_dir.mkdir(parents=True, exist_ok=True)
+        migrated = prepare_directory(self.data_dir, self.legacy_data_dir)
         self.log_handler = logging.FileHandler(
             self.data_dir / "farm-preview.log", encoding="utf-8",
         )
@@ -89,6 +94,8 @@ class Runtime:
         ))
         logging.getLogger(__package__).setLevel(logging.INFO)
         logging.getLogger(__package__).addHandler(self.log_handler)
+        if migrated:
+            logger.info('farm data directory migrated farm_preview -> farm_db')
         try:
             await self.store.initialize(catalogue=self.service.catalogue)
         except Exception:
@@ -163,17 +170,29 @@ class Runtime:
                 return HELP
             if action == "shop":
                 page = int(args[0]) if args else 1
-                if not 1 <= page <= 100 or len(args) > 1:
+                if len(args) > 1:
                     raise ValueError()
-                plants = sorted(
-                    (p for p in self.service.catalogue if p.buyable),
-                    key=lambda p: p.plant_id,
-                )
-                chunk = plants[(page-1)*12:page*12]
-                return "种子商店 " + str(page) + "页\n" + "\n".join(
-                    f"{p.name}（#{p.plant_id}）："
-                    f"{p.cost}{'点券' if p.is_vip else '农场币'}"
-                    f" / 等级{p.level}" for p in chunk
+                try:
+                    chunk, pages = shop_page(self.service.catalogue, page)
+                except ValueError:
+                    return '页码无效，请发送：种子商店 1'
+                if self.rendering:
+                    account = None
+                    try:
+                        account = (await self.service.snapshot(who)).account
+                    except FarmError as error:
+                        if error.code != 'not_registered':
+                            raise
+                    return await self.rendering.seed_shop(
+                        chunk, account, page, pages,
+                    )
+                return f'种子商店 第{page}/{pages}页\n' + '\n'.join(
+                    f'{p.name}（#{p.plant_id}）：'
+                    f'{p.cost}{"点券" if p.is_vip else "农场币"}'
+                    f' / 等级{p.level}' for p in chunk
+                ) + (
+                    '\n购买种子 #编号 数量 或 购买种子 种子名 数量'
+                    + (f'\n下一页：种子商店 {page+1}' if page < pages else '')
                 )
             if action == "inventory":
                 if args:

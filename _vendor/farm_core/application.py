@@ -120,11 +120,14 @@ class FarmService:
                 repository.save_plot(start_growth(replace(
                     plot, plant=plant, mature_at=mature_at, harvest_count=0,
                 ), now))
+            experience = integer(amount * 2)
+            repository.asset(Asset.EXPERIENCE, experience)
             return self._result(
                 repository, name=plant.name, plant_id=plant.plant_id,
                 quantity=amount,
                 slots=[p.slot for p in empty[:amount]],
                 seeds=repository.item(plant).seeds,
+                experience=experience,
             )
 
         return await self._execute(
@@ -200,8 +203,11 @@ class FarmService:
                     growth_updated_at=None, next_pest_at=None,
                     maturity_pests=0,
                 ))
+            experience = integer(len(withered) * 2)
+            repository.asset(Asset.EXPERIENCE, experience)
             return self._result(
                 repository, slots=[p.slot for p in withered],
+                experience=experience,
             )
 
         return await self._execute(
@@ -221,9 +227,11 @@ class FarmService:
                 repository.save_plot(advance_plot(updated, now))
             if not cleared:
                 raise FarmError("nothing_to_clear")
+            quantity = integer(sum(item['pests'] for item in cleared))
+            repository.asset(Asset.EXPERIENCE, quantity)
             return self._result(
                 repository, cleared=cleared,
-                quantity=sum(item["pests"] for item in cleared),
+                quantity=quantity, experience=quantity,
             )
 
         return await self._execute(

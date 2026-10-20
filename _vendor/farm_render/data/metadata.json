@@ -6195,11 +6195,60 @@
         120
       ]
     },
+    "webgl/panel/CouponIcon.png": {
+      "sha256": "8f564bf9da5c0fbeb65a3e320cfb47d66648405f09e2309a42825c1f5404caf1",
+      "size": [
+        64,
+        64
+      ]
+    },
+    "webgl/panel/ExpBar.png": {
+      "sha256": "efb13c2dcb1ecd49689ed561d3f816312738f84887e01496385914e86dcf87d5",
+      "size": [
+        223,
+        30
+      ]
+    },
+    "webgl/panel/ExpProgress.png": {
+      "sha256": "fcb1bdc9a568758460e005a1be58c04d8346eaedfcbc3fef59b29ad0dedcfdc0",
+      "size": [
+        225,
+        23
+      ]
+    },
+    "webgl/panel/GoldIcon.png": {
+      "sha256": "5389afb3a3b1245e9fdc8d3a8839c8ff07a653ebf160bb8e43882a461e73ce49",
+      "size": [
+        64,
+        64
+      ]
+    },
+    "webgl/panel/HeadFrame.png": {
+      "sha256": "74e8f716f58f9055d873657eb8fbaea2170ea19365fe83299b8e32f8484b0b62",
+      "size": [
+        230,
+        230
+      ]
+    },
+    "webgl/panel/PersionInfoBG.png": {
+      "sha256": "62971e70743418988982667625f3e6e4e61073e74610c5279919be2e71c1bd10",
+      "size": [
+        492,
+        236
+      ]
+    },
     "webgl/seed.png": {
       "sha256": "353ff338fd5ab3f7812e9d2d7f98df11d0de4e04af6de7f9d5aa0249d40b3609",
       "size": [
         69,
         30
+      ]
+    },
+    "webgl/shop-board.png": {
+      "sha256": "88730b82d88cb33fae45c7180a88954fcc0241b2b4f5de095fc6b22b30296645",
+      "size": [
+        1024,
+        1536
       ]
     },
     "webgl/wither.png": {
@@ -6209,6 +6258,159 @@
         92
       ]
     }
+  },
+  "panel": {
+    "anchor": "top_left",
+    "avatar": [
+      32.2744255065918,
+      39.76182556152344,
+      111.38700103759766,
+      107.70719909667969
+    ],
+    "fields": [
+      {
+        "alignment": 3,
+        "color": [
+          74,
+          31,
+          0
+        ],
+        "field": "name",
+        "rect": [
+          161.24510192871094,
+          40.90002250671387,
+          298.0353088378906,
+          31.200000762939453
+        ]
+      },
+      {
+        "alignment": 4,
+        "color": [
+          91,
+          110,
+          3
+        ],
+        "field": "experience",
+        "rect": [
+          177.60003662109375,
+          89.78792595863342,
+          223.0,
+          22.024199962615967
+        ]
+      },
+      {
+        "alignment": 4,
+        "color": [
+          216,
+          112,
+          0
+        ],
+        "field": "level",
+        "rect": [
+          400.9734191894531,
+          85.36273193359375,
+          56.0,
+          30.0
+        ]
+      },
+      {
+        "alignment": 3,
+        "color": [
+          255,
+          255,
+          255
+        ],
+        "field": "point",
+        "rect": [
+          178.46239471435547,
+          128.23919677734375,
+          123.61039733886719,
+          30.0
+        ]
+      },
+      {
+        "alignment": 3,
+        "color": [
+          255,
+          255,
+          255
+        ],
+        "field": "vip_point",
+        "rect": [
+          342.0,
+          128.23919677734375,
+          108.0,
+          30.0
+        ]
+      }
+    ],
+    "reference_canvas": [
+      1920,
+      1080
+    ],
+    "source_prefab": "mainscene#WebGLPersionInfo",
+    "sprites": [
+      {
+        "name": "PersionInfoBG",
+        "rect": [
+          0.0,
+          0.0,
+          492.0,
+          236.0
+        ],
+        "sprite": "webgl/panel/PersionInfoBG.png"
+      },
+      {
+        "name": "HeadFrame",
+        "rect": [
+          3.092998504638672,
+          8.865001678466797,
+          169.75,
+          169.5
+        ],
+        "sprite": "webgl/panel/HeadFrame.png"
+      },
+      {
+        "name": "ExpBar",
+        "rect": [
+          177.60000610351562,
+          85.89997100830078,
+          223.0,
+          30.0
+        ],
+        "sprite": "webgl/panel/ExpBar.png"
+      },
+      {
+        "name": "ExpProgress",
+        "rect": [
+          179.90000915527344,
+          89.89997100830078,
+          215.0,
+          22.0
+        ],
+        "sprite": "webgl/panel/ExpProgress.png"
+      },
+      {
+        "name": "GoldIcon",
+        "rect": [
+          146.5999984741211,
+          128.8000030517578,
+          30.0,
+          30.0
+        ],
+        "sprite": "webgl/panel/GoldIcon.png"
+      },
+      {
+        "name": "CouponIcon",
+        "rect": [
+          310.5,
+          128.8000030517578,
+          30.0,
+          30.0
+        ],
+        "sprite": "webgl/panel/CouponIcon.png"
+      }
+    ]
   },
   "pest": {
     "display_size": [

@@ -17,6 +17,7 @@ from .models import RenderOptions, RenderResult
 logger = logging.getLogger(__name__)
 MAX_AVATAR_BYTES = 2 * 1024 * 1024
 MAX_AVATAR_PIXELS = 4_000_000
+PANEL_UNUSED_ROW = (168, 208)
 
 
 class FarmRenderer:
@@ -218,45 +219,64 @@ class FarmRenderer:
         return avatar
 
     def _panel(self, canvas, scene, options, avatar):
-        s = lambda n: self._scale(n, options)
-
-        def paste_asset(name, position):
-            original = self.assets.metadata["images"][name]["size"]
-            image = self.assets.image(
-                name, tuple(max(1, s(n)) for n in original),
-            )
-            canvas.paste(image, tuple(s(n) for n in position))
-
-        paste_asset("background/userInfo.png", (100, 30))
-        canvas.paste(
-            self._avatar(avatar, (max(1, s(140)), max(1, s(150)))),
-            (s(125), s(85)),
-        )
-        paste_asset("background/frame/frame.png", (75, 44))
+        layout = self.assets.metadata['panel']
+        s = lambda n: round(n * options.width / layout['reference_canvas'][0])
         account = scene.account
         level = account.level
         current = account.experience - 200 * level * (level + 1) // 2
-        next_total = 200 * (level + 1) * (level + 2) // 2
-        progress = min(247, max(0, current * 247 // next_total))
-        if progress:
-            canvas.rectangle(
-                tuple(s(n) for n in (292, 164, 292 + progress, 189)),
-                (171, 194, 41),
+        next_total = 200 * (level + 1)
+        for entry in layout['sprites']:
+            x, y, w, h = entry['rect']
+            image = self.assets.image(
+                entry['sprite'], (max(1, s(w)), max(1, s(h))),
             )
-        lines = (
-            (account.name, (300, 92), 24, (77, 35, 4), 330),
-            (f"{current} / {next_total}", (365, 164), 20,
-             (102, 120, 19), 165),
-            (str(level), (570, 158), 32, (214, 111, 1), 60),
-            (str(account.point), (330, 211), 24, (253, 253, 253), 100),
-            (str(account.vip_point), (570, 211), 24, (253, 253, 253), 40),
-        )
-        for value, position, original_size, color, width in lines:
-            size = max(1, s(original_size))
+            if entry['name'] == 'PersionInfoBG':
+                start, end = (s(n) for n in PANEL_UNUSED_ROW)
+                compact = Image.new('RGBA', (
+                    image.width, image.height - (end - start),
+                ))
+                compact.paste(image.crop((0, 0, image.width, start)))
+                compact.paste(image.crop((
+                    0, end, image.width, image.height,
+                )), (0, start))
+                image = compact
+            if entry['name'] == 'ExpProgress':
+                filled = min(image.width, max(
+                    0, current * image.width // next_total,
+                ))
+                if not filled:
+                    continue
+                image = image.crop((0, 0, filled, image.height))
+            canvas.paste(image, (s(x), s(y)))
+            if entry['name'] == 'PersionInfoBG':
+                ax, ay, aw, ah = layout['avatar']
+                canvas.paste(self._avatar(
+                    avatar, (max(1, s(aw)), max(1, s(ah))),
+                ), (s(ax), s(ay)))
+        values = {
+            'name': account.name, 'experience': f'{current} / {next_total}',
+            'level': str(level), 'point': str(account.point),
+            'vip_point': str(account.vip_point),
+        }
+        for entry in layout['fields']:
+            x, y, w, h = entry['rect']
+            value = values[entry['field']]
+            width, height = max(1, s(w)), max(1, s(h))
+            size = height
+            while size > 1:
+                box = font(self.font_path, size).getbbox(value)
+                if (box[2]-box[0] <= width
+                        and box[3]-box[1] <= height):
+                    break
+                size -= 1
             text = canvas.fit_text(
-                value, self.font_path, size, max(1, s(width)),
+                value, self.font_path, size, width,
             )
+            box = font(self.font_path, size).getbbox(text)
+            left = s(x) - box[0]
+            if entry['alignment'] == 4:
+                left += (width - (box[2]-box[0])) // 2
+            top = s(y) + (height - (box[3]-box[1])) // 2 - box[1]
             canvas.text(
-                tuple(s(n) for n in position), text,
-                self.font_path, size, color,
+                (left, top), text, self.font_path, size, tuple(entry['color']),
             )
