@@ -252,6 +252,48 @@ class SQLiteStore:
         if not self._ready:
             raise StorageError("store_not_initialized_or_closed")
 
+    async def migrate_legacy(self, source, identity, catalogue, now):
+        from .legacy import import_user, migration_id, read_user
+
+        self._ensure_ready()
+
+        def execute():
+            with self._connection() as connection:
+                self._validate(connection)
+                connection.execute('BEGIN IMMEDIATE')
+                try:
+                    bound = connection.execute(
+                        "SELECT identity FROM operations "
+                        "WHERE operation_id=? AND action='legacy_import'",
+                        (migration_id(identity.user_id),),
+                    ).fetchall()
+                    if bound:
+                        if any(row[0] != identity.key for row in bound):
+                            raise FarmError('legacy_identity_bound')
+                        connection.commit()
+                        return False
+                    archive = read_user(source, identity.user_id)
+                    migrated = bool(archive) and import_user(
+                        connection, identity, archive, catalogue, now,
+                    )
+                    connection.commit()
+                    if migrated:
+                        LOGGER.info(
+                            'farm legacy migration committed operation=%s '
+                            'tables=%s', migration_id(identity.user_id),
+                            {name: len(rows) for name, rows in archive.items()},
+                        )
+                    return migrated
+                except BaseException:
+                    connection.rollback()
+                    LOGGER.exception(
+                        'farm legacy migration rolled back operation=%s',
+                        migration_id(identity.user_id),
+                    )
+                    raise
+
+        return await self._offload(execute)
+
     async def transact(
         self, identity: Identity, operation_id: str, action: str,
         parameters: dict, now: int, operation,

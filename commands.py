@@ -15,12 +15,12 @@ from zhenxun.utils.message import MessageUtils
 from zhenxun.utils.platform import PlatformUtils
 
 from .runtime import COMMANDS, Runtime
-from .data_paths import data_directories
+from .data_paths import data_directory
 from .config_migration import migrate_config
 
 logger = logging.getLogger(__name__)
 driver = get_driver()
-data_dir, legacy_data_dir = data_directories(
+data_dir = data_directory(
     DATA_PATH, getattr(driver.config, 'farm_preview_data_dir', None),
 )
 runtime = Runtime(
@@ -29,7 +29,6 @@ runtime = Runtime(
     getattr(driver.config, "farm_preview_deployment", "zhenxun-preview"),
     str(getattr(driver.config, "farm_preview_image_format", "AUTO")).upper(),
     font_dir=FONT_PATH,
-    legacy_data_dir=legacy_data_dir,
 )
 async def start_runtime():
     from zhenxun.configs.config import Config

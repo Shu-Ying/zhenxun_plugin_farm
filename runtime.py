@@ -13,7 +13,6 @@ from ._vendor.farm_core.presentation import receipt_text, snapshot_text
 from ._vendor.farm_render import FarmRenderer, RenderOptions, RenderService
 from ._vendor.farm_render.seasons import season_for
 from ._vendor.farm_render.shop import shop_page
-from .data_paths import prepare_directory
 
 logger = logging.getLogger(__name__)
 COMMANDS = {
@@ -36,9 +35,13 @@ HELP = (
     "每只虫使生长速度降低5%；成熟时每只虫使本季减产5%。\n"
     "成熟后除虫不能恢复本季减产；生长期间可发送：农场除虫。\n"
     "我的农场按北京时间自动切换春夏秋冬背景；高清使用相同季节。\n"
-    "本版使用独立预览数据库，不会读取旧版资产。"
+    "旧版农场数据在首次使用时迁移，绑定当前机器人和平台。"
 )
 ERRORS = {
+    "legacy_identity_bound":"旧农场已绑定其他机器人或平台，请联系管理员。",
+    "legacy_account_conflict":"新旧农场账号冲突，未覆盖，请联系管理员。",
+    "legacy_schema_unsupported":"旧农场数据库结构不兼容，请联系管理员。",
+    "legacy_data_invalid":"旧农场数据异常，迁移已回滚，请联系管理员。",
     "not_registered":"请先发送：开通农场",
     "unknown_plant":"没有这种作物，请查看种子商店。",
     "ambiguous_plant":"存在同名作物，请使用商店或仓库中的 #编号。",
@@ -69,23 +72,23 @@ def operation_id(bot_id, platform, user_id, message_id, action):
 
 class Runtime:
     def __init__(self, data_dir, font_path=None, deployment="zhenxun-preview",
-                 image_format="AUTO", *, font_dir=None, legacy_data_dir=None):
+                 image_format="AUTO", *, font_dir=None):
         self.data_dir = Path(data_dir).resolve()
-        self.legacy_data_dir = legacy_data_dir
         self.font_path = font_path
         self.font_dir = Path(font_dir or "resources/font")
         self.deployment = deployment
         self.image_format = image_format
-        self.store = SQLiteStore(self.data_dir / "farm-preview.sqlite3")
+        self.store = SQLiteStore(self.data_dir / "farm.sqlite3")
         self.service = FarmService(self.store, Catalogue.bundled())
         self.rendering = None
         self.started = False
         self.log_handler = None
+        self.legacy_source = self.data_dir / 'farm.db'
 
     async def start(self):
         if self.started:
             return
-        migrated = prepare_directory(self.data_dir, self.legacy_data_dir)
+        self.data_dir.mkdir(parents=True, exist_ok=True)
         self.log_handler = logging.FileHandler(
             self.data_dir / "farm-preview.log", encoding="utf-8",
         )
@@ -94,8 +97,6 @@ class Runtime:
         ))
         logging.getLogger(__package__).setLevel(logging.INFO)
         logging.getLogger(__package__).addHandler(self.log_handler)
-        if migrated:
-            logger.info('farm data directory migrated farm_preview -> farm_db')
         try:
             await self.store.initialize(catalogue=self.service.catalogue)
         except Exception:
@@ -148,6 +149,18 @@ class Runtime:
             return "农场尚未初始化，请检查启动日志。"
         try:
             who = Identity(self.deployment, str(bot_id), platform, str(user_id))
+            try:
+                await self.store.migrate_legacy(
+                    self.legacy_source, who, self.service.catalogue,
+                    self.service.clock(),
+                )
+            except (FarmError, KeyError, TypeError) as error:
+                logger.exception('farm legacy migration failed')
+                code = getattr(error, 'code', '')
+                return ERRORS.get(
+                    code if code.startswith('legacy_') else '',
+                    '旧农场数据无法迁移，请联系管理员检查日志。',
+                )
             args = shlex.split(arguments)
             if action == "farm" and args:
                 aliases = {
