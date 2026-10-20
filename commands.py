@@ -77,7 +77,7 @@ def handler_for(action):
             message_id = getattr(event, "id", None)
         try:
             avatar = (await avatar_for(user_id, platform)
-                      if action == "farm" else None)
+                      if action in ("farm", "details") else None)
             response = await runtime.execute(
                 action, args.extract_plain_text(), bot_id=str(bot.self_id),
                 platform=platform, user_id=user_id, message_id=message_id,

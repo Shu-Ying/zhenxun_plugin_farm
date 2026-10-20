@@ -13,10 +13,11 @@ from ._vendor.farm_core.presentation import receipt_text, snapshot_text
 from ._vendor.farm_render import FarmRenderer, RenderOptions, RenderService
 from ._vendor.farm_render.seasons import season_for
 from ._vendor.farm_render.shop import shop_page
+from ._vendor.farm_render.details import detail_rows, details_text
 
 logger = logging.getLogger(__name__)
 COMMANDS = {
-    "开通农场":"register", "我的农场":"farm", "农场详述":"inventory",
+    "开通农场":"register", "我的农场":"farm", "农场详述":"details",
     "我的农场币":"inventory", "我的点券":"inventory",
     "我的种子":"inventory", "我的作物":"inventory",
     "种子商店":"shop", "农场帮助":"help", "购买种子":"buy",
@@ -25,7 +26,7 @@ COMMANDS = {
     "农场除虫":"clear_pests", "除虫":"clear_pests",
 }
 HELP = (
-    "开通农场 [名称]｜我的农场 [高清]｜农场详述\n"
+    "开通农场 [名称]｜我的农场 [高清]｜农场详述 [页码]\n"
     "种子商店 [页码]｜购买种子 作物 数量｜播种 作物 [数量]\n"
     "收获｜铲除｜农场除虫｜我的种子｜我的作物\n"
     "作物加锁 作物｜作物解锁 作物｜出售作物 [作物] [数量]\n"
@@ -164,7 +165,7 @@ class Runtime:
             args = shlex.split(arguments)
             if action == "farm" and args:
                 aliases = {
-                    "detail":"inventory", "my-point":"inventory",
+                    "detail":"details", "my-point":"inventory",
                     "my-vipPoint":"inventory", "my-seed":"inventory",
                     "my-plant":"inventory", "seed-shop":"shop",
                     "buy-seed":"buy", "sowing":"sow", "harvest":"harvest",
@@ -198,6 +199,7 @@ class Runtime:
                             raise
                     return await self.rendering.seed_shop(
                         chunk, account, page, pages,
+                        image_format=self.image_format,
                     )
                 return f'种子商店 第{page}/{pages}页\n' + '\n'.join(
                     f'{p.name}（#{p.plant_id}）：'
@@ -206,6 +208,25 @@ class Runtime:
                 ) + (
                     '\n购买种子 #编号 数量 或 购买种子 种子名 数量'
                     + (f'\n下一页：种子商店 {page+1}' if page < pages else '')
+                )
+            if action == 'details':
+                if len(args) > 1:
+                    raise ValueError()
+                page = int(args[0]) if args else 1
+                snapshot = await self.service.snapshot(who)
+                now = self.service.clock()
+                try:
+                    rows, pages = detail_rows(
+                        self.rendering.renderer if self.rendering else None,
+                        who, snapshot, now, page,
+                    )
+                except ValueError:
+                    return '页码无效，请发送：农场详述 1'
+                if not self.rendering:
+                    return details_text(rows, page, pages)
+                return await self.rendering.farm_details(
+                    who, snapshot, now, page, season_for(now),
+                    image_format=self.image_format, avatar=avatar,
                 )
             if action == "inventory":
                 if args:

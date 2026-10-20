@@ -6,6 +6,7 @@ import shlex
 from PIL import Image
 
 from .canvas import Canvas, font
+from .models import RenderOptions
 
 logger = logging.getLogger(__name__)
 PAGE_SIZE = 6
@@ -29,7 +30,9 @@ def duration(seconds):
     ) if value) or '0秒'
 
 
-def render_shop(renderer, plants, account, page, pages):
+def render_shop(renderer, plants, account, page, pages, image_format='AUTO'):
+    options = RenderOptions(format=image_format, quality=80)
+    codec = options.codec()
     canvas = Canvas(renderer.assets.image('webgl/shop-board.png', (1024, 1536)))
 
     def text(value, xy, size=28, color='#5b3015', width=850):
@@ -90,4 +93,7 @@ def render_shop(renderer, plants, account, page, pages):
     elif page > 1:
         navigation += f'    上一页：种子商店 {page-1}'
     text(navigation, (263, 1420), 23, width=510)
-    return canvas.encode('PNG')
+    content = canvas.encode(codec, options.quality, options.method)
+    logger.info('farm shop render width=%s height=%s bytes=%s codec=%s',
+                *canvas.image.size, len(content), codec)
+    return content

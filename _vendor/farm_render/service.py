@@ -7,6 +7,7 @@ import time
 import hashlib
 
 from .shop import render_shop
+from .details import render_details
 
 logger = logging.getLogger(__name__)
 
@@ -65,11 +66,12 @@ class RenderService:
     async def _run(self, *args):
         return await self._run_function(self.renderer.render, *args)
 
-    async def seed_shop(self, plants, account, page, pages):
+    async def seed_shop(self, plants, account, page, pages,
+                        image_format='AUTO'):
         if self._closed:
             raise RuntimeError('Render service closed')
         key = 'shop:' + hashlib.sha256(
-            repr((plants, account, page, pages)).encode(),
+            repr((plants, account, page, pages, image_format)).encode(),
         ).hexdigest()
         task = self._pending.get(key)
         if task is None:
@@ -77,6 +79,32 @@ class RenderService:
                 raise RuntimeError('Render queue full')
             task = asyncio.create_task(self._run_function(
                 render_shop, self.renderer, plants, account, page, pages,
+                image_format,
+            ))
+            self._pending[key] = task
+
+            def finished(done):
+                self._pending.pop(key, None)
+                if not done.cancelled():
+                    done.exception()
+
+            task.add_done_callback(finished)
+        return await asyncio.shield(task)
+
+    async def farm_details(self, identity, snapshot, now, page, theme,
+                           image_format='AUTO', avatar=None):
+        if self._closed:
+            raise RuntimeError('Render service closed')
+        key = 'details:' + hashlib.sha256(repr((
+            identity, snapshot, now, page, theme, image_format, avatar,
+        )).encode()).hexdigest()
+        task = self._pending.get(key)
+        if task is None:
+            if len(self._pending) >= self._max_pending:
+                raise RuntimeError('Render queue full')
+            task = asyncio.create_task(self._run_function(
+                render_details, self.renderer, identity, snapshot, now,
+                page, theme, image_format, avatar,
             ))
             self._pending[key] = task
 
