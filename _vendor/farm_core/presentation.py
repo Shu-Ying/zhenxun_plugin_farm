@@ -4,6 +4,25 @@ from .domain import Receipt, Snapshot
 
 
 def receipt_text(receipt: Receipt) -> str:
+    if receipt.action == 'steal':
+        data = receipt.data
+        items = data['items']
+        lines = [f"偷菜成功：{len(items)}块地，共{data['quantity']}个。"
+                 if items else '本次未偷到作物，不消耗次数。']
+        grouped = {}
+        for item in items:
+            key = (item['plant_id'], item['name'])
+            grouped[key] = grouped.get(key, 0)+item['quantity']
+        lines.extend(f'{name}（#{pid}）×{amount}'
+                     for (pid, name), amount in grouped.items())
+        reasons = {'already_stolen': '本季已偷过',
+                   'protected': '防偷保护', 'not_ripe': '无成熟作物'}
+        notes = [f'{reasons[key]} {count}块'
+                 for key, count in data['skipped'].items() if count]
+        if notes:
+            lines.append('跳过：'+'；'.join(notes))
+        lines.append(f"今日剩余：{data['remaining_attempts']}/5次（北京时间）")
+        return '\n'.join(lines)
     labels = {
         "register": "注册", "buy": "购买", "sow": "播种",
         "harvest": "收获", "eradicate": "铲除",
@@ -31,6 +50,20 @@ def receipt_text(receipt: Receipt) -> str:
     lines.append(f"点券：{account['vip_point']}")
     lines.append(f"累计经验：{account['experience']}")
     return "\n".join(lines)
+
+
+def plot_ids_text(snapshot: Snapshot) -> str:
+    """无图片能力时按实际快照返回地块编号。"""
+    owned = sorted(plot.slot for plot in snapshot.plots)
+    remaining = sorted(set(range(1, 31)) - set(owned))
+    return '\n'.join((
+        '地块编号',
+        f'已开垦（{len(owned)}块）：' + ('、'.join(map(str, owned)) or '无'),
+        f'待开垦（{len(remaining)}块）：'
+        + ('、'.join(map(str, remaining)) or '无'),
+        '前两排交错编号，之后逐排推进。',
+        '发送「农场详述」查看各地块的作物信息。',
+    ))
 
 
 def snapshot_text(snapshot: Snapshot) -> str:

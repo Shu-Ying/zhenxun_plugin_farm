@@ -1,6 +1,7 @@
-"""真寻接入编排；核心私有导入，测试数据与旧版隔离。"""
+"""真寻与 NoneBot 共用的运行编排；不导入宿主框架。"""
 
 import hashlib
+from dataclasses import replace
 import json
 import logging
 from pathlib import Path
@@ -9,26 +10,35 @@ import shlex
 from ._vendor.farm_core import Catalogue, FarmService, Identity, SQLiteStore
 from ._vendor.farm_core.domain import FarmError
 from ._vendor.farm_core.storage import SCHEMA_VERSION
-from ._vendor.farm_core.presentation import receipt_text, snapshot_text
+from ._vendor.farm_core.presentation import (
+    plot_ids_text, receipt_text, snapshot_text,
+)
 from ._vendor.farm_render import FarmRenderer, RenderOptions, RenderService
 from ._vendor.farm_render.seasons import season_for
 from ._vendor.farm_render.shop import shop_page
 from ._vendor.farm_render.details import detail_rows, details_text
+from ._vendor.farm_render.warehouse import (
+    warehouse_page, warehouse_rows, warehouse_text,
+)
 
 logger = logging.getLogger(__name__)
 COMMANDS = {
     "开通农场":"register", "我的农场":"farm", "农场详述":"details",
     "我的农场币":"inventory", "我的点券":"inventory",
-    "我的种子":"inventory", "我的作物":"inventory",
+    "我的种子":"seeds", "我的作物":"crops",
     "种子商店":"shop", "农场帮助":"help", "购买种子":"buy",
     "播种":"sow", "收获":"harvest", "铲除":"eradicate",
     "作物加锁":"lock", "作物解锁":"unlock", "出售作物":"sell",
-    "农场除虫":"clear_pests", "除虫":"clear_pests",
+    "农场除虫":"clear_pests", "除虫":"clear_pests", "地块编号":"plot_ids",
+    "偷菜":"steal",
 }
 HELP = (
     "开通农场 [名称]｜我的农场 [高清]｜农场详述 [页码]\n"
+    "地块编号 [高清]｜查看当前土地编号及开垦位置\n"
+    "偷菜 @目标｜每日最多5次成功偷取\n"
+    "我的种子/我的作物 [页码] [高清/文字]，默认标准压缩图。\n"
     "种子商店 [页码]｜购买种子 作物 数量｜播种 作物 [数量]\n"
-    "收获｜铲除｜农场除虫｜我的种子｜我的作物\n"
+    "收获｜铲除｜农场除虫｜我的种子 [页码]｜我的作物 [页码]\n"
     "作物加锁 作物｜作物解锁 作物｜出售作物 [作物] [数量]\n"
     "作物可填写名称或 #编号；同名作物请使用商店或仓库中的编号。\n"
     "每成功播种1块地获得2经验；收获经验按作物结算。\n"
@@ -39,6 +49,10 @@ HELP = (
     "旧版农场数据在首次使用时迁移，绑定当前机器人和平台。"
 )
 ERRORS = {
+    'cannot_steal_self': '不能偷自己的农场。',
+    'different_farm_scope': '只能偷取当前机器人、平台内的农场。',
+    'target_not_registered': '目标尚未开通当前农场。',
+    'steal_daily_limit': '今日成功偷菜已达5次，北京时间零点恢复。',
     "legacy_identity_bound":"旧农场已绑定其他机器人或平台，请联系管理员。",
     "legacy_account_conflict":"新旧农场账号冲突，未覆盖，请联系管理员。",
     "legacy_schema_unsupported":"旧农场数据库结构不兼容，请联系管理员。",
@@ -73,9 +87,11 @@ def operation_id(bot_id, platform, user_id, message_id, action):
 
 class Runtime:
     def __init__(self, data_dir, font_path=None, deployment="zhenxun-preview",
-                 image_format="AUTO", *, font_dir=None):
+                 image_format="AUTO", *, font_dir=None,
+                 font_setting="FARM_PREVIEW_FONT"):
         self.data_dir = Path(data_dir).resolve()
         self.font_path = font_path
+        self.font_setting = font_setting
         self.font_dir = Path(font_dir or "resources/font")
         self.deployment = deployment
         self.image_format = image_format
@@ -144,7 +160,7 @@ class Runtime:
 
     async def execute(
         self, action, arguments, *, bot_id, platform, user_id, message_id,
-        display_name="农场玩家", avatar=None,
+        display_name="农场玩家", avatar=None, target_user_id=None,
     ):
         if not self.started:
             return "农场尚未初始化，请检查启动日志。"
@@ -166,8 +182,8 @@ class Runtime:
             if action == "farm" and args:
                 aliases = {
                     "detail":"details", "my-point":"inventory",
-                    "my-vipPoint":"inventory", "my-seed":"inventory",
-                    "my-plant":"inventory", "seed-shop":"shop",
+                    "my-vipPoint":"inventory", "my-seed":"seeds",
+                    "my-plant":"crops", "seed-shop":"shop",
                     "buy-seed":"buy", "sowing":"sow", "harvest":"harvest",
                     "eradicate":"eradicate", "lock-plant":"lock",
                     "unlock-plant":"unlock", "sell-plant":"sell",
@@ -228,15 +244,38 @@ class Runtime:
                     who, snapshot, now, page, season_for(now),
                     image_format=self.image_format, avatar=avatar,
                 )
+            if action in ('crops', 'seeds'):
+                title = '我的作物' if action == 'crops' else '我的种子'
+                mode = args.pop() if args and args[-1] in ('高清', '文字') else ''
+                if len(args) > 1:
+                    raise ValueError()
+                try:
+                    page = int(args[0]) if args else 1
+                except ValueError:
+                    return f'页码无效，请发送：{title} 1'
+                snapshot = await self.service.snapshot(who)
+                rows = warehouse_rows(snapshot, self.service.catalogue, action)
+                try:
+                    _, pages = warehouse_page(rows, page)
+                except ValueError:
+                    return f'页码无效，请发送：{title} 1'
+                if not self.rendering or mode == '文字':
+                    return warehouse_text(rows, snapshot, action, page, pages)
+                return await self.rendering.warehouse(
+                    rows, snapshot, action, page, pages, self.image_format,
+                    mode == '高清',
+                )
             if action == "inventory":
                 if args:
                     raise ValueError()
                 return snapshot_text(await self.service.snapshot(who))
-            if action == "farm":
+            if action in ("farm", "plot_ids"):
                 if args not in ([], ["高清"]):
                     raise ValueError()
                 if not self.rendering:
-                    return "请配置 FARM_PREVIEW_FONT 为可用中文字体路径。"
+                    if action == "plot_ids":
+                        return plot_ids_text(await self.service.snapshot(who))
+                    return f"请配置 {self.font_setting} 为可用中文字体路径。"
                 now = self.service.clock()
                 theme = season_for(now)
                 logger.info("farm preview seasonal theme=%s", theme)
@@ -245,6 +284,8 @@ class Runtime:
                     if args else RenderOptions(format=self.image_format,
                                                theme=theme)
                 )
+                if action == "plot_ids":
+                    options = replace(options, show_plot_ids=True)
                 picture = await self.rendering.my_farm(
                     self.service, who, options=options, avatar=avatar,
                     supported=("JPEG",),
@@ -253,7 +294,15 @@ class Runtime:
                 return picture.content
             if op is None:
                 return "无法取得稳定消息标识，本次写操作未执行。"
-            if action == "register":
+            if action == 'steal':
+                if target_user_id is None:
+                    return '请发送：偷菜 @目标，不支持直接输入QQ号。'
+                if args:
+                    return '请只指定一个偷菜目标，不要附加QQ号或其他文字。'
+                target = Identity(who.deployment, who.realm, who.platform,
+                                  str(target_user_id))
+                receipt = await self.service.steal(who, target, op)
+            elif action == "register":
                 name = " ".join(args) if args else display_name
                 name = " ".join(str(name).split())[:64] or "农场玩家"
                 receipt = await self.service.register(who, name, op)
@@ -280,7 +329,16 @@ class Runtime:
                 receipt = await getattr(self.service, action)(who, op)
             else:
                 return HELP
-            return receipt_text(receipt)
+            text = receipt_text(receipt)
+            if action == 'register':
+                if receipt.data['created']:
+                    count = receipt.data.get('plot_count')
+                    granted = (f'已获得{count}块土地' if count is not None
+                               else '已获得初始土地')
+                    text += f'\n{granted}，发送「地块编号」查看位置。'
+                else:
+                    text += '\n发送「地块编号」查看土地位置。'
+            return text
         except FarmError as error:
             return ERRORS.get(error.code, "操作未完成：" + error.code)
         except ValueError:

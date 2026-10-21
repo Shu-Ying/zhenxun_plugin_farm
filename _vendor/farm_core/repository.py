@@ -42,7 +42,7 @@ class SQLiteRepository:
         )
         self._db.executemany(
             "INSERT INTO plots(identity, slot) VALUES (?, ?)",
-            [(self._identity, slot) for slot in range(1, 4)],
+            [(self._identity, slot) for slot in range(1, 7)],
         )
         self.asset(Asset.POINT, 500)
         return True
@@ -138,7 +138,7 @@ class SQLiteRepository:
                     r["yield_bonus"], r["experience_bonus"],
                     r["pest_count"], r["pest_spawned"], r["growth_remaining"],
                     r["growth_updated_at"], r["next_pest_at"],
-                    r["maturity_pests"],
+                    r["maturity_pests"], r['stolen_count'],
                 )
                 for r in rows
             )
@@ -154,14 +154,41 @@ class SQLiteRepository:
             "UPDATE plots SET plant=?, mature_at=?, harvest_count=?, "
             "yield_bonus=?, experience_bonus=?, pest_count=?, pest_spawned=?, "
             "growth_remaining=?, growth_updated_at=?, next_pest_at=?, "
-            "maturity_pests=? WHERE identity=? AND slot=?",
+            "maturity_pests=?, stolen_count=? WHERE identity=? AND slot=?",
             (
                 data, plot.mature_at, plot.harvest_count, plot.yield_bonus,
                 plot.experience_bonus, plot.pest_count, plot.pest_spawned,
                 plot.growth_remaining, plot.growth_updated_at,
-                plot.next_pest_at, plot.maturity_pests,
+                plot.next_pest_at, plot.maturity_pests, plot.stolen_count,
                 self._identity, plot.slot,
             ),
         )
         if cursor.rowcount != 1:
             raise FarmError("unknown_plot")
+
+    def for_identity(self, identity):
+        """同一事务内访问目标账户，禁止独立提交。"""
+        return SQLiteRepository(self._db, identity.key, self._operation_id,
+                                self._action, self._now)
+
+    def theft_seen(self, slot, thief):
+        return self._db.execute(
+            'SELECT 1 FROM thefts WHERE owner=? AND slot=? AND thief=?',
+            (self._identity, slot, thief.key),
+        ).fetchone() is not None
+
+    def record_theft(self, slot, thief):
+        self._db.execute('INSERT INTO thefts VALUES (?, ?, ?)',
+                         (self._identity, slot, thief.key))
+
+    def clear_thefts(self, slot):
+        self._db.execute('DELETE FROM thefts WHERE owner=? AND slot=?',
+                         (self._identity, slot))
+
+    def successful_thefts(self, day_start):
+        return self._db.execute(
+            "SELECT COUNT(*) FROM operations WHERE identity=? "
+            "AND action='steal' AND created_at>=? AND created_at<? "
+            "AND json_extract(result, '$.quantity')>0",
+            (self._identity, day_start, day_start+86400),
+        ).fetchone()[0]

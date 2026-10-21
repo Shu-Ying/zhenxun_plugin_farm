@@ -76,12 +76,32 @@ def handler_for(action):
         if message_id is None:
             message_id = getattr(event, "id", None)
         try:
+            target_user_id = None
+            if action == 'steal':
+                mentions = [str(seg.data.get('qq', seg.data.get(
+                    'user_id', seg.data.get('id', ''),
+                ))) for seg in args if seg.type in (
+                    'at', 'mention', 'mention_user', 'mention_everyone',
+                )]
+                if len(mentions) > 1:
+                    await MessageUtils.build_message(
+                        '请只指定一个偷菜目标。',
+                    ).send(reply_to=True)
+                    return
+                if mentions:
+                    target_user_id = mentions[0]
+                    if target_user_id in ('', 'all'):
+                        await MessageUtils.build_message(
+                            '请@一个具体用户。',
+                        ).send(reply_to=True)
+                        return
             avatar = (await avatar_for(user_id, platform)
-                      if action in ("farm", "details") else None)
+                      if action in ("farm", "details", "plot_ids") else None)
             response = await runtime.execute(
                 action, args.extract_plain_text(), bot_id=str(bot.self_id),
                 platform=platform, user_id=user_id, message_id=message_id,
                 display_name=session.user.name or "农场玩家", avatar=avatar,
+                target_user_id=target_user_id,
             )
         except Exception as error:
             logger.error(

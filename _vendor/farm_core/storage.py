@@ -16,7 +16,7 @@ from .catalogue import Catalogue
 
 LOGGER = logging.getLogger(__name__)
 APPLICATION_ID = 0x4641524D
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 
 PEST_COLUMNS = {
     "pest_count": (
@@ -72,10 +72,18 @@ SCHEMA = (
         harvest_count INTEGER NOT NULL DEFAULT 0 CHECK(harvest_count>=0),
         yield_bonus INTEGER NOT NULL DEFAULT 0,
         experience_bonus INTEGER NOT NULL DEFAULT 0,
+        stolen_count INTEGER NOT NULL DEFAULT 0 CHECK(stolen_count>=0),
         """ + ",\n        ".join(
             f"{name} {definition}" for name, definition in PEST_COLUMNS.items()
         ) + """,
         PRIMARY KEY(identity, slot)
+    )""",
+    """CREATE TABLE thefts(
+        owner TEXT NOT NULL,
+        slot INTEGER NOT NULL,
+        thief TEXT NOT NULL REFERENCES accounts(identity),
+        PRIMARY KEY(owner, slot, thief),
+        FOREIGN KEY(owner, slot) REFERENCES plots(identity, slot)
     )""",
     """CREATE TABLE ledger(
         id INTEGER PRIMARY KEY,
@@ -137,6 +145,8 @@ class SQLiteStore:
             )
         }
         expected = {"accounts", "operations", "inventory", "plots", "ledger"}
+        if expected_version >= 4:
+            expected.add('thefts')
         if (
             app_id != APPLICATION_ID or version != expected_version
             or tables != expected
@@ -227,15 +237,28 @@ class SQLiteStore:
                         )
                     connection.execute("PRAGMA user_version=3")
                     migrated_pests = True
+                    version = 3
+                if app == APPLICATION_ID and version == 3:
+                    self._validate(connection, expected_version=3)
+                    connection.execute(
+                        'ALTER TABLE plots ADD COLUMN stolen_count '
+                        'INTEGER NOT NULL DEFAULT 0 CHECK(stolen_count>=0)'
+                    )
+                    connection.execute(next(
+                        sql for sql in SCHEMA
+                        if sql.startswith('CREATE TABLE thefts(')
+                    ))
+                    connection.execute('PRAGMA user_version=4')
+                    LOGGER.info('farm schema migrated version=4 theft=enabled')
                 self._validate(connection)
                 connection.commit()
                 if migrated_rows is not None:
                     LOGGER.info(
-                        "farm schema migrated version=3 inventory_rows=%s",
+                        "farm schema migrated version=4 inventory_rows=%s",
                         migrated_rows,
                     )
                 elif migrated_pests:
-                    LOGGER.info("farm schema migrated version=3 pests=enabled")
+                    LOGGER.info("farm schema migrated version=4 pests=enabled")
             except BaseException:
                 connection.rollback()
                 LOGGER.warning("farm schema initialization rolled back")

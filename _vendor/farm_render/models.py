@@ -14,8 +14,11 @@ class RenderOptions:
     quality: int = 75  # 有损编码质量，不代表分辨率。
     method: int = 2  # WebP 编码力度，0最快，6最慢。
     theme: str = "default"  # 显式主题，不读取隐含季节或全局配置。
+    show_plot_ids: bool = False  # 编号图显示全部地块及开垦状态。
 
     def __post_init__(self):
+        if type(self.show_plot_ids) is not bool:
+            raise ValueError("Invalid plot ID option")
         for value, low, high in (
             (self.width, 256, 3072), (self.quality, 1, 95),
             (self.method, 0, 6),
@@ -48,7 +51,7 @@ class RenderOptions:
 
 @dataclass(frozen=True)
 class PlotView:
-    slot: int  # 旧布局的1到30地块编号。
+    slot: int  # 1到30地块编号，对应统一位置表的slot-1项。
     state: str  # empty/growing/ripe/withered。
     sprite: str = ""  # 包内受控素材名，不来自用户路径。
     stage: int = 0  # 本季展示阶段。

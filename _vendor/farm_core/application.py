@@ -2,6 +2,7 @@
 
 from dataclasses import asdict, replace
 import time
+import secrets
 
 from .catalogue import Catalogue
 from .domain import (
@@ -9,6 +10,7 @@ from .domain import (
 )
 from .ports import Store
 from .pests import advance_plot, start_growth
+from .yield_rules import season_yield, remaining_yield
 
 
 class FarmService:
@@ -55,7 +57,10 @@ class FarmService:
 
         def operation(repository, now):
             created = repository.register(name)
-            return self._result(repository, created=created)
+            return self._result(
+                repository, created=created,
+                plot_count=len(repository.plots()),
+            )
 
         return await self._execute(
             identity, operation_id, "register", {"name": name}, operation,
@@ -148,8 +153,7 @@ class FarmService:
                     or plot.mature_at > now
                 ):
                     continue
-                amount = boosted(plant.harvest, plot.yield_bonus)
-                amount = amount * (100 - 5 * plot.maturity_pests) // 100
+                amount = remaining_yield(plot)
                 experience = boosted(
                     plant.experience, plot.experience_bonus,
                 )
@@ -165,7 +169,9 @@ class FarmService:
                     pest_count=0, pest_spawned=0, growth_remaining=None,
                     growth_updated_at=None, next_pest_at=None,
                     maturity_pests=0,
+                    stolen_count=0,
                 )
+                repository.clear_thefts(plot.slot)
                 repository.save_plot(
                     start_growth(updated, now) if count < plant.crop
                     else updated
@@ -197,11 +203,13 @@ class FarmService:
             if not withered:
                 raise FarmError("nothing_to_eradicate")
             for plot in withered:
+                repository.clear_thefts(plot.slot)
                 repository.save_plot(replace(
                     plot, plant=None, mature_at=None, harvest_count=0,
                     pest_count=0, pest_spawned=0, growth_remaining=None,
                     growth_updated_at=None, next_pest_at=None,
                     maturity_pests=0,
+                    stolen_count=0,
                 ))
             experience = integer(len(withered) * 2)
             repository.asset(Asset.EXPERIENCE, experience)
@@ -213,6 +221,64 @@ class FarmService:
         return await self._execute(
             identity, operation_id, "eradicate", {}, operation,
         )
+
+    async def steal(self, identity: Identity, target: Identity,
+                    operation_id: str):
+        self._identity(identity)
+        self._identity(target)
+        if identity == target:
+            raise FarmError('cannot_steal_self')
+        if (identity.deployment, identity.realm, identity.platform) != (
+            target.deployment, target.realm, target.platform
+        ):
+            raise FarmError('different_farm_scope')
+
+        def operation(repository, now):
+            repository.account()
+            owner = repository.for_identity(target)
+            try:
+                owner.account()
+            except FarmError as error:
+                if error.code == 'not_registered':
+                    raise FarmError('target_not_registered') from error
+                raise
+            day_start = ((now+28800)//86400)*86400-28800
+            used = repository.successful_thefts(day_start)
+            if used >= 5:
+                raise FarmError('steal_daily_limit')
+            items = []
+            skipped = {'not_ripe': 0, 'already_stolen': 0, 'protected': 0}
+            for stored in owner.plots():
+                plot = advance_plot(stored, now)
+                if (plot.plant is None or plot.withered
+                        or plot.mature_at is None or plot.mature_at > now):
+                    skipped['not_ripe'] += 1
+                    continue
+                if owner.theft_seen(plot.slot, identity):
+                    skipped['already_stolen'] += 1
+                    continue
+                total = season_yield(plot)
+                available = remaining_yield(plot)-(total+1)//2
+                if available <= 0:
+                    skipped['protected'] += 1
+                    continue
+                amount = min(secrets.randbelow(3)+1, available)
+                repository.stock(plot.plant, crops=amount)
+                owner.save_plot(replace(
+                    plot, stolen_count=plot.stolen_count+amount,
+                ))
+                owner.record_theft(plot.slot, identity)
+                items.append({'slot': plot.slot, 'name': plot.plant.name,
+                              'plant_id': plot.plant.plant_id,
+                              'quantity': amount})
+            return self._result(
+                repository, items=items, skipped=skipped,
+                quantity=sum(i['quantity'] for i in items),
+                remaining_attempts=5-used-bool(items),
+            )
+
+        return await self._execute(identity, operation_id, 'steal',
+                                   {'target': target.key}, operation)
 
     async def clear_pests(self, identity: Identity, operation_id: str):
         def operation(repository, now):

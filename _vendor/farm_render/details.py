@@ -56,7 +56,8 @@ def detail_rows(renderer, identity, snapshot, now, page):
             continue
         ripe = plot.mature_at is not None and plot.mature_at <= now
         pests = plot.maturity_pests if ripe else plot.pest_count
-        amount = boosted(plant.harvest, plot.yield_bonus)*(100-5*pests)//100
+        amount = max(0, boosted(plant.harvest, plot.yield_bonus)
+                     *(100-5*pests)//100-plot.stolen_count)
         info = metadata['plants'].get(plant.name)
         total = len(set(info['phase'].split(','))) if info else None
         stage = ('成熟' if ripe else

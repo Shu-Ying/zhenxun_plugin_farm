@@ -70,6 +70,8 @@ class FarmRenderer:
         self._pests(canvas, scene, options)
         self._decorations(canvas, options, "foreground")
         self._panel(canvas, scene, options, avatar)
+        if options.show_plot_ids:
+            self._plot_ids(canvas, scene, options)
         composed = perf_counter()
         content = canvas.encode(codec, options.quality, options.method)
         encoded = perf_counter()
@@ -91,6 +93,43 @@ class FarmRenderer:
     @staticmethod
     def _scale(value, options):
         return round(value * options.width / 3072)
+
+    def _plot_ids(self, canvas, scene, options):
+        s = lambda n: self._scale(n, options)
+        owned = {plot.slot for plot in scene.plots}
+        soil_w, soil_h = self.assets.metadata['soil_size']
+        size = max(1, s(40))
+        for slot, pos in enumerate(self.assets.metadata['positions'], 1):
+            x = s(pos['x'] + soil_w/2)
+            y = s(pos['y'] + soil_h/2)
+            color = '#fff2ca' if slot in owned else '#d5e8bc'
+            canvas.rectangle(
+                (x-s(38), y-s(30), x+s(38), y+s(30)),
+                '#493b22', radius=s(30),
+            )
+            canvas.rectangle(
+                (x-s(36), y-s(28), x+s(36), y+s(28)),
+                color, radius=s(28),
+            )
+            label = str(slot)
+            width = canvas.measure_text(label, self.font_path, size)
+            box = font(self.font_path, size).getbbox(label)
+            canvas.text(
+                (round(x-width/2), round(y-(box[1]+box[3])/2)),
+                label, self.font_path, size, '#392917',
+            )
+        canvas.rectangle(
+            (s(76), s(1676), s(2996), s(1836)),
+            '#fff2ca', radius=s(24),
+        )
+        for y, text, text_size in (
+            (1694, '地块编号  ·  浅色：已开垦  ｜  绿色：待开垦', 46),
+            (1760, '前两排交错编号，之后逐排推进。作物信息：农场详述', 40),
+        ):
+            canvas.text(
+                (s(116), s(y)), text, self.font_path,
+                max(1, s(text_size)), '#392917',
+            )
 
     def _base(self, scene, options):
         slots = frozenset(p.slot for p in scene.plots)
