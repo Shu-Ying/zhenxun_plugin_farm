@@ -4,6 +4,7 @@ from dataclasses import replace
 import hashlib
 from io import BytesIO
 import logging
+from math import sqrt
 from pathlib import Path
 from time import perf_counter
 
@@ -13,6 +14,7 @@ from .assets import Assets, ByteLRU
 from .canvas import Canvas, font
 from .layout import scene_from_snapshot
 from .models import RenderOptions, RenderResult
+from .placement import ground_contact, place_sprite
 
 logger = logging.getLogger(__name__)
 MAX_AVATAR_BYTES = 2 * 1024 * 1024
@@ -138,7 +140,8 @@ class FarmRenderer:
         s = lambda n: self._scale(n, options)
         soil_w, soil_h = self.assets.metadata["soil_size"]
         rules = self.assets.metadata["placement"]
-        unit = soil_h / rules["reference_soil_height"]
+        (a, b), (c, d) = rules['scene_transform']
+        scene_scale = sqrt(abs(a*d-b*c))
         first_ripe = True
         for plot in scene.plots:
             if not plot.sprite:
@@ -147,29 +150,28 @@ class FarmRenderer:
             metadata = self.assets.metadata["images"].get(plot.sprite)
             if metadata is None:
                 logger.warning("farm render missing packaged crop sprite")
-                plant = Image.new("RGBA", (max(1, s(60)),) * 2, "#597b45")
+                plant = Image.new("RGBA", (60, 60), "#597b45")
                 ImageDraw.Draw(plant).text(
-                    (s(10), 0), "?", fill="white",
-                    font=font(self.font_path, max(10, s(48))),
+                    (10, 0), "?", fill="white",
+                    font=font(self.font_path, 48),
                 )
             else:
-                factor = rules["common_scale"] if (
-                    plot.stage == 0 or plot.state == "withered"
-                ) else rules["growth_scale"]
-                size = [n * factor * unit for n in metadata["size"]]
-                plant = self.assets.image(
-                    plot.sprite, tuple(max(1, s(n)) for n in size),
-                )
-            center_x = pos["x"] + soil_w / 2
-            bottom = pos["y"] + soil_h
+                plant = self.assets.image(plot.sprite)
+            factor = rules['growth_scale']
             if plot.stage == 0 or plot.state == "withered":
-                bottom = pos["y"] + soil_h / 2
-                if plot.state == "withered":
-                    bottom += rules["wither_down"] * unit
-            xy = (
-                round(center_x * options.width / 3072 - plant.width / 2),
-                s(bottom) - plant.height,
+                factor = rules['common_scale']
+            scale = scene_scale*factor*options.width/3072
+            plant = plant.resize(
+                tuple(max(1, round(n*scale)) for n in plant.size),
+                Image.Resampling.LANCZOS,
             )
+            contact = ground_contact(
+                plant, centered=plot.stage == 0 and plot.state != 'withered',
+                threshold=rules['contact_alpha_threshold'],
+                band_fraction=rules['contact_band_fraction'],
+            )
+            xy = (round((pos['x']+soil_w/2)*options.width/3072-contact[0]),
+                  round((pos['y']+soil_h/2)*options.width/3072-contact[1]))
             canvas.paste(plant, xy)
             if plot.state == "ripe" and first_ripe:
                 icon = self.assets.image(
@@ -179,25 +181,20 @@ class FarmRenderer:
                 first_ripe = False
 
     def _pests(self, canvas, scene, options):
-        s = lambda n: self._scale(n, options)
         soil_w, soil_h = self.assets.metadata["soil_size"]
-        unit = soil_h / self.assets.metadata["placement"][
-            "reference_soil_height"
-        ]
+        transform = self.assets.metadata['placement']['scene_transform']
         config = self.assets.metadata["pest"]
-        size = tuple(max(1, s(n * unit)) for n in config["display_size"])
         for plot in scene.plots:
             if plot.state not in ("growing", "ripe"):
                 continue
             pos = self.assets.metadata["positions"][plot.slot - 1]
             for frame, (x, y) in zip(plot.pest_frames, config["positions"]):
-                image = self.assets.image(frame, size)
-                center_x = pos["x"] + soil_w / 2 + x * unit
-                center_y = pos["y"] + soil_h / 2 - y * unit
-                canvas.paste(image, (
-                    round(center_x * options.width / 3072 - image.width / 2),
-                    round(center_y * options.width / 3072 - image.height / 2),
-                ))
+                image = self.assets.image(frame, config['display_size'])
+                image, xy = place_sprite(
+                    image, (pos['x']+soil_w/2, pos['y']+soil_h/2),
+                    (x, y), (.5, .5), 1, transform, options.width/3072,
+                )
+                canvas.paste(image, xy)
 
     def _avatar(self, content, size):
         if content and len(content) <= MAX_AVATAR_BYTES:
