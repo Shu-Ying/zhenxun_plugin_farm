@@ -68,11 +68,12 @@ class RenderService:
         return await self._run_function(self.renderer.render, *args)
 
     async def seed_shop(self, plants, account, page, pages,
-                        image_format='AUTO'):
+                        image_format='AUTO', quality=75):
         if self._closed:
             raise RuntimeError('Render service closed')
         key = 'shop:' + hashlib.sha256(
-            repr((plants, account, page, pages, image_format)).encode(),
+            repr((plants, account, page, pages, image_format,
+                  quality)).encode(),
         ).hexdigest()
         task = self._pending.get(key)
         if task is None:
@@ -80,7 +81,7 @@ class RenderService:
                 raise RuntimeError('Render queue full')
             task = asyncio.create_task(self._run_function(
                 render_shop, self.renderer, plants, account, page, pages,
-                image_format,
+                image_format, quality,
             ))
             self._pending[key] = task
 
@@ -93,11 +94,11 @@ class RenderService:
         return await asyncio.shield(task)
 
     async def farm_details(self, identity, snapshot, now, page, theme,
-                           image_format='AUTO', avatar=None):
+                           image_format='AUTO', avatar=None, quality=75):
         if self._closed:
             raise RuntimeError('Render service closed')
         key = 'details:' + hashlib.sha256(repr((
-            identity, snapshot, now, page, theme, image_format, avatar,
+            identity, snapshot, now, page, theme, image_format, avatar, quality,
         )).encode()).hexdigest()
         task = self._pending.get(key)
         if task is None:
@@ -105,7 +106,7 @@ class RenderService:
                 raise RuntimeError('Render queue full')
             task = asyncio.create_task(self._run_function(
                 render_details, self.renderer, identity, snapshot, now,
-                page, theme, image_format, avatar,
+                page, theme, image_format, avatar, quality,
             ))
             self._pending[key] = task
 
@@ -118,11 +119,11 @@ class RenderService:
         return await asyncio.shield(task)
 
     async def warehouse(self, rows, snapshot, kind, page, pages,
-                        image_format='AUTO', high=False):
+                        image_format='AUTO', high=False, quality=75):
         if self._closed:
             raise RuntimeError('Render service closed')
         key = ('warehouse', rows, snapshot, kind, page, pages,
-               image_format, high)
+               image_format, high, quality)
         cached = self.renderer.results.get(key)
         if cached is not None:
             return cached
@@ -132,7 +133,7 @@ class RenderService:
                 raise RuntimeError('Render queue full')
             task = asyncio.create_task(self._run_function(
                 render_warehouse, self.renderer, rows, snapshot, kind,
-                page, pages, image_format, high,
+                page, pages, image_format, high, quality,
             ))
             self._pending[key] = task
 

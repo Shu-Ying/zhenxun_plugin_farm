@@ -11,7 +11,8 @@ def season_duration(plot: Plot) -> int:
 
 
 def spawn_interval(plot: Plot) -> int:
-    return max(3600, (season_duration(plot) + 3) // 4)
+    """至少留出两小时，每半个基础生长周期才发生一次虫害。"""
+    return max(7200, (season_duration(plot) + 1) // 2)
 
 
 def start_growth(plot: Plot, now: int) -> Plot:

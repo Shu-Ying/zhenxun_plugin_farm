@@ -18,6 +18,15 @@ from .runtime import COMMANDS, Runtime
 from .data_paths import data_directory
 from .config_migration import migrate_config
 
+
+def image_quality():
+    from zhenxun.configs.config import Config
+
+    return Config.get(__package__.split('.')[-1]).get(
+        '农场图片质量', 75, build_model=False,
+    )
+
+
 logger = logging.getLogger(__name__)
 driver = get_driver()
 data_dir = data_directory(
@@ -29,6 +38,7 @@ runtime = Runtime(
     getattr(driver.config, "farm_preview_deployment", "zhenxun-preview"),
     str(getattr(driver.config, "farm_preview_image_format", "AUTO")).upper(),
     font_dir=FONT_PATH,
+    image_quality_provider=image_quality,
 )
 async def start_runtime():
     from zhenxun.configs.config import Config

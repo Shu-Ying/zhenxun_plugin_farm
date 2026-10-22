@@ -34,15 +34,17 @@ COMMANDS = {
 }
 HELP = (
     "开通农场 [名称]｜我的农场 [高清]｜农场详述 [页码]\n"
-    "地块编号 [高清]｜查看当前土地编号及开垦位置\n"
+    "地块编号｜查看当前土地编号及开垦位置\n"
     "偷菜 @目标｜每日最多5次成功偷取\n"
-    "我的种子/我的作物 [页码] [高清/文字]，默认标准压缩图。\n"
+    "我的种子/我的作物 [页码] [文字]，默认图片。\n"
+    "全部图片使用农场图片质量配置；仅我的农场支持高清。\n"
     "种子商店 [页码]｜购买种子 作物 数量｜播种 作物 [数量]\n"
     "收获｜铲除｜农场除虫｜我的种子 [页码]｜我的作物 [页码]\n"
     "作物加锁 作物｜作物解锁 作物｜出售作物 [作物] [数量]\n"
     "作物可填写名称或 #编号；同名作物请使用商店或仓库中的编号。\n"
     "每成功播种1块地获得2经验；收获经验按作物结算。\n"
     "每铲除1块枯萎地块获得2经验；每清除1只虫获得1经验。\n"
+    "新播种及下一季每半个基础生长周期生虫一次，间隔至少2小时。\n"
     "每只虫使生长速度降低5%；成熟时每只虫使本季减产5%。\n"
     "成熟后除虫不能恢复本季减产；生长期间可发送：农场除虫。\n"
     "我的农场按北京时间自动切换春夏秋冬背景；高清使用相同季节。\n"
@@ -88,7 +90,11 @@ def operation_id(bot_id, platform, user_id, message_id, action):
 class Runtime:
     def __init__(self, data_dir, font_path=None, deployment="zhenxun-preview",
                  image_format="AUTO", *, font_dir=None,
-                 font_setting="FARM_PREVIEW_FONT"):
+                 font_setting="FARM_PREVIEW_FONT", image_quality=75,
+                 image_quality_provider=None):
+        RenderOptions(quality=image_quality)
+        self.image_quality = image_quality
+        self.image_quality_provider = image_quality_provider
         self.data_dir = Path(data_dir).resolve()
         self.font_path = font_path
         self.font_setting = font_setting
@@ -198,6 +204,21 @@ class Runtime:
             )
             if action == "help":
                 return HELP
+            image_actions = ('farm', 'plot_ids', 'details', 'shop',
+                             'seeds', 'crops')
+            if action in image_actions and action != 'farm' and '高清' in args:
+                return '仅我的农场支持高清，请移除高清参数后重试。'
+            quality = self.image_quality
+            text_mode = (action in ('seeds', 'crops') and args
+                         and args[-1] == '文字')
+            if action in image_actions and self.rendering and not text_mode:
+                try:
+                    if self.image_quality_provider is not None:
+                        quality = self.image_quality_provider()
+                    RenderOptions(quality=quality)
+                except (TypeError, ValueError):
+                    logger.warning('farm image quality config invalid')
+                    return '农场图片质量配置无效，请设置为1～95的整数。'
             if action == "shop":
                 page = int(args[0]) if args else 1
                 if len(args) > 1:
@@ -216,6 +237,7 @@ class Runtime:
                     return await self.rendering.seed_shop(
                         chunk, account, page, pages,
                         image_format=self.image_format,
+                        quality=quality,
                     )
                 return f'种子商店 第{page}/{pages}页\n' + '\n'.join(
                     f'{p.name}（#{p.plant_id}）：'
@@ -243,10 +265,11 @@ class Runtime:
                 return await self.rendering.farm_details(
                     who, snapshot, now, page, season_for(now),
                     image_format=self.image_format, avatar=avatar,
+                    quality=quality,
                 )
             if action in ('crops', 'seeds'):
                 title = '我的作物' if action == 'crops' else '我的种子'
-                mode = args.pop() if args and args[-1] in ('高清', '文字') else ''
+                mode = args.pop() if args and args[-1] == '文字' else ''
                 if len(args) > 1:
                     raise ValueError()
                 try:
@@ -263,7 +286,7 @@ class Runtime:
                     return warehouse_text(rows, snapshot, action, page, pages)
                 return await self.rendering.warehouse(
                     rows, snapshot, action, page, pages, self.image_format,
-                    mode == '高清',
+                    quality=quality,
                 )
             if action == "inventory":
                 if args:
@@ -280,9 +303,10 @@ class Runtime:
                 theme = season_for(now)
                 logger.info("farm preview seasonal theme=%s", theme)
                 options = (
-                    RenderOptions.high(format=self.image_format, theme=theme)
+                    RenderOptions(width=1536, quality=max(quality, 85),
+                                  format=self.image_format, theme=theme)
                     if args else RenderOptions(format=self.image_format,
-                                               theme=theme)
+                                               theme=theme, quality=quality)
                 )
                 if action == "plot_ids":
                     options = replace(options, show_plot_ids=True)

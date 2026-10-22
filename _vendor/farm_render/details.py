@@ -98,9 +98,10 @@ def details_text(rows, page, pages):
 
 
 def render_details(renderer, identity, snapshot, now, page,
-                   theme='default', image_format='AUTO', avatar=None):
+                   theme='default', image_format='AUTO', avatar=None,
+                   quality=75):
     rows, pages = detail_rows(renderer, identity, snapshot, now, page)
-    options = RenderOptions(format=image_format, quality=85, theme=theme)
+    options = RenderOptions(format=image_format, quality=quality, theme=theme)
     farm = renderer.render(identity, snapshot, now, options, avatar)
     height = 922 + max(1, len(rows))*92
     canvas = Canvas.new((1024, height), '#ac713c')
@@ -166,6 +167,7 @@ def render_details(renderer, identity, snapshot, now, page,
     text(navigation, 40, footer, 22, width=940)
     codec = options.codec(('JPEG',))
     content = canvas.encode(codec, options.quality, options.method)
-    logger.info('farm details page=%s pages=%s rows=%s bytes=%s codec=%s',
-                page, pages, len(rows), len(content), codec)
+    logger.info('farm details page=%s pages=%s rows=%s bytes=%s codec=%s '
+                'quality=%s', page, pages, len(rows), len(content), codec,
+                options.quality)
     return content

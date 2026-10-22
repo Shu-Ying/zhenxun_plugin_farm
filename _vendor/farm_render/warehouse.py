@@ -110,9 +110,10 @@ def warehouse_text(rows, snapshot, kind, page, pages):
 
 
 def render_warehouse(renderer, rows, snapshot, kind, page, pages,
-                     image_format='AUTO', high=False):
+                     image_format='AUTO', high=False, quality=75):
     options = RenderOptions(width=1024 if high else 768,
-                            format=image_format, quality=85 if high else 70)
+                            format=image_format,
+                            quality=max(85, quality) if high else quality)
     codec = options.codec()
     scale = options.width/1024
     s = lambda n: round(n*scale)

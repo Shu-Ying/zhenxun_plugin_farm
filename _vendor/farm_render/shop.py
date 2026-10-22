@@ -30,8 +30,9 @@ def duration(seconds):
     ) if value) or '0秒'
 
 
-def render_shop(renderer, plants, account, page, pages, image_format='AUTO'):
-    options = RenderOptions(format=image_format, quality=80)
+def render_shop(renderer, plants, account, page, pages, image_format='AUTO',
+                quality=75):
+    options = RenderOptions(format=image_format, quality=quality)
     codec = options.codec()
     canvas = Canvas(renderer.assets.image('webgl/shop-board.png', (1024, 1536)))
 
@@ -94,6 +95,7 @@ def render_shop(renderer, plants, account, page, pages, image_format='AUTO'):
         navigation += f'    上一页：种子商店 {page-1}'
     text(navigation, (263, 1420), 23, width=510)
     content = canvas.encode(codec, options.quality, options.method)
-    logger.info('farm shop render width=%s height=%s bytes=%s codec=%s',
-                *canvas.image.size, len(content), codec)
+    logger.info('farm shop render width=%s height=%s bytes=%s codec=%s '
+                'quality=%s', *canvas.image.size, len(content), codec,
+                options.quality)
     return content
