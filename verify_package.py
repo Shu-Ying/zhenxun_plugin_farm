@@ -38,7 +38,9 @@ def verify_files(files):
             raise ValueError("Package checksum mismatch")
     required = {"__init__.py", "runtime.py", "commands.py", "requirements.txt",
                 "LICENSE", "_vendor/farm_core/__init__.py",
-                "_vendor/farm_render/data/assets.zip"}
+                "_vendor/farm_render/data/asset-manifest.json"}
+    if any(name.endswith('/assets.zip') for name in files):
+        raise ValueError('Resource ZIP must not be in plugin repository')
     if not required <= set(files):
         raise ValueError("Incomplete plugin")
     return manifest

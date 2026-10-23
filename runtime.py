@@ -1,6 +1,7 @@
-"""真寻与 NoneBot 共用的运行编排；不导入宿主框架。"""
+"""各平台适配器共用的运行编排；不导入宿主框架。"""
 
 import hashlib
+import asyncio
 from dataclasses import replace
 import json
 import logging
@@ -9,12 +10,16 @@ import shlex
 
 from ._vendor.farm_core import Catalogue, FarmService, Identity, SQLiteStore
 from ._vendor.farm_core.domain import FarmError
+from ._vendor.farm_core.commands import (
+    command_map, command_specs, help_text,
+)
 from ._vendor.farm_core.storage import SCHEMA_VERSION
 from ._vendor.farm_core.presentation import (
     plot_ids_text, receipt_text, snapshot_text,
 )
 from ._vendor.farm_render import FarmRenderer, RenderOptions, RenderService
 from ._vendor.farm_render.seasons import season_for
+from ._vendor.farm_render.bundle import ensure_assets, validate_options
 from ._vendor.farm_render.shop import shop_page
 from ._vendor.farm_render.details import detail_rows, details_text
 from ._vendor.farm_render.warehouse import (
@@ -22,36 +27,8 @@ from ._vendor.farm_render.warehouse import (
 )
 
 logger = logging.getLogger(__name__)
-COMMANDS = {
-    "开通农场":"register", "我的农场":"farm", "农场详述":"details",
-    "我的农场币":"inventory", "我的点券":"inventory",
-    "我的种子":"seeds", "我的作物":"crops",
-    "种子商店":"shop", "农场帮助":"help", "购买种子":"buy",
-    "播种":"sow", "收获":"harvest", "铲除":"eradicate",
-    "作物加锁":"lock", "作物解锁":"unlock", "出售作物":"sell",
-    "农场除虫":"clear_pests", "除虫":"clear_pests", "地块编号":"plot_ids",
-    "偷菜":"steal",
-    "开垦":"reclaim",
-}
-HELP = (
-    "开通农场 [名称]｜我的农场 [高清]｜农场详述 [页码]\n"
-    "地块编号｜查看当前土地编号及开垦位置\n"
-    "偷菜 @目标｜每日最多5次成功偷取\n"
-    "开垦｜每次增加1块普通空地；开垦 条件｜查看等级和费用\n"
-    "我的种子/我的作物 [页码] [文字]，默认图片。\n"
-    "全部图片使用农场图片质量配置；仅我的农场支持高清。\n"
-    "种子商店 [页码]｜购买种子 作物 数量｜播种 作物 [数量]\n"
-    "收获｜铲除｜农场除虫｜我的种子 [页码]｜我的作物 [页码]\n"
-    "作物加锁 作物｜作物解锁 作物｜出售作物 [作物] [数量]\n"
-    "作物可填写名称或 #编号；同名作物请使用商店或仓库中的编号。\n"
-    "每成功播种1块地获得2经验；收获经验按作物结算。\n"
-    "每铲除1块枯萎地块获得2经验；每清除1只虫获得1经验。\n"
-    "新播种及下一季每半个基础生长周期生虫一次，间隔至少2小时。\n"
-    "每只虫使生长速度降低5%；成熟时每只虫使本季减产5%。\n"
-    "成熟后除虫不能恢复本季减产；生长期间可发送：农场除虫。\n"
-    "我的农场按北京时间自动切换春夏秋冬背景；高清使用相同季节。\n"
-    "旧版农场数据在首次使用时迁移，绑定当前机器人和平台。"
-)
+COMMANDS = command_map('zhenxun')
+HELP = help_text(command_specs('zhenxun'))
 ERRORS = {
     'land_origin_unknown': '农场初始土地来源无法确认，未补地或扣币，'
                            '请联系管理员核查注册或迁移记录。',
@@ -100,8 +77,17 @@ class Runtime:
     def __init__(self, data_dir, font_path=None, deployment="zhenxun-preview",
                  image_format="AUTO", *, font_dir=None,
                  font_setting="FARM_PREVIEW_FONT", image_quality=75,
-                 image_quality_provider=None):
+                 image_quality_provider=None, framework='zhenxun',
+                 resource_source='Github', service_url='',
+                 resource_options_provider=None):
         RenderOptions(quality=image_quality)
+        validate_options(resource_source, service_url)
+        self.resource_source = resource_source
+        self.service_url = service_url
+        self.resource_options_provider = resource_options_provider
+        self.framework = framework
+        self.command_specs = command_specs(framework)
+        self.commands = command_map(framework)
         self.image_quality = image_quality
         self.image_quality_provider = image_quality_provider
         self.data_dir = Path(data_dir).resolve()
@@ -147,11 +133,27 @@ class Runtime:
                 "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
                 "/usr/share/fonts/truetype/wqy/wqy-microhei.ttc",
             ))
-        for candidate in candidates:
+        try:
+            if self.resource_options_provider is not None:
+                self.resource_source, self.service_url = (
+                    self.resource_options_provider()
+                )
+            bundle_path = await asyncio.to_thread(
+                ensure_assets, self.data_dir, self.resource_source,
+                self.service_url,
+            )
+        except Exception:
+            # 不将下载URL、服务地址或可能带凭据的网络异常写入日志。
+            logger.error('farm assets unavailable; using text; '
+                         'check resource source and service address')
+            bundle_path = None
+        for candidate in candidates if bundle_path is not None else ():
             if not candidate.is_file():
                 continue
             try:
-                self.rendering = RenderService(FarmRenderer(candidate))
+                self.rendering = RenderService(FarmRenderer(
+                    candidate, bundle_path=bundle_path,
+                ))
                 logger.info("farm preview font selected file=%s", candidate.name)
                 break
             except (ValueError, OSError):
@@ -180,6 +182,10 @@ class Runtime:
         if not self.started:
             return "农场尚未初始化，请检查启动日志。"
         try:
+            args = shlex.split(arguments)
+            # 帮助无需注册或迁移玩家数据，绘图失败可直接阅读文字。
+            if action == 'help':
+                return await self.help_menu(args)
             who = Identity(self.deployment, str(bot_id), platform, str(user_id))
             try:
                 await self.store.migrate_legacy(
@@ -212,7 +218,7 @@ class Runtime:
                 bot_id, platform, str(user_id), message_id, action,
             )
             if action == "help":
-                return HELP
+                return await self.help_menu(args)
             if action == 'reclaim' and args == ['条件']:
                 conditions = await self.service.reclaim_conditions(who)
                 return (
@@ -371,7 +377,7 @@ class Runtime:
                     raise ValueError()
                 receipt = await getattr(self.service, action)(who, op)
             else:
-                return HELP
+                return help_text(self.command_specs)
             text = receipt_text(receipt)
             if action == 'register':
                 if receipt.data['created']:
@@ -386,3 +392,27 @@ class Runtime:
             return ERRORS.get(error.code, "操作未完成：" + error.code)
         except ValueError:
             return "参数有误，请发送：农场帮助"
+
+    async def help_menu(self, args):
+        if '高清' in args:
+            return '仅我的农场支持高清，请移除高清参数后重试。'
+        if args not in ([], ['文字']):
+            return '参数有误，请发送：农场帮助 或 农场帮助 文字'
+        fallback = help_text(self.command_specs)
+        if args or self.rendering is None:
+            return fallback
+        quality = self.image_quality
+        if self.image_quality_provider is not None:
+            quality = self.image_quality_provider()
+        try:
+            RenderOptions(quality=quality)
+        except (ValueError, TypeError):
+            logger.warning('farm help image quality config invalid')
+            return '农场图片质量配置无效，请设置为1～95的整数。'
+        try:
+            return await self.rendering.help_menu(
+                self.command_specs, self.framework, self.image_format, quality,
+            )
+        except (OSError, ValueError, RuntimeError):
+            logger.exception('farm help rendering failed; using text')
+            return fallback

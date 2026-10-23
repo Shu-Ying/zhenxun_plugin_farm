@@ -1,6 +1,15 @@
 <div align="center">
 
 # 真寻农场(zhenxun_plugin_farm)
+
+<img src="./logo.png" width="400" alt="真寻农场 Logo">
+
+> 资源配置：「资源获取地址」默认Github，可选Github、Gitea、farm_service；
+> 「farm_service 地址」始终独立存在，供资源及后续活动服务共用。
+> 选择farm_service下载时填写HTTPS基础地址，两项修改后重载。
+> 插件不携带assets.zip，启动校验缓存SHA256，缺失或不匹配时从所选源获取；
+> Github/Gitea均使用farm_service仓库根目录assets/。失败保留文字功能，重载重试。
+> 活动服务尚未实现，请先发布服务仓库素材再发布插件。
 <p align="center">
     <a href="./LICENSE">
         <img src="https://img.shields.io/badge/license-GPL3.0-FE7D37" alt="license">

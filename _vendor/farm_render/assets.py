@@ -42,11 +42,12 @@ class ByteLRU:
 
 
 class Assets:
-    def __init__(self, cache_bytes=32 * 1024 * 1024):
+    def __init__(self, cache_bytes=32 * 1024 * 1024, bundle_path=None):
         data = resources.files(__package__).joinpath("data")
         self.metadata = json.loads(data.joinpath("metadata.json").read_bytes())
         self.cache = ByteLRU(cache_bytes)
-        self._bundle = data.joinpath("assets.zip")
+        self._bundle = (bundle_path if bundle_path is not None
+                        else data.joinpath('assets.zip'))
 
     def image(self, name, size=None):
         if name not in self.metadata["images"]:

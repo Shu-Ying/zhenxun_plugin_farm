@@ -6484,9 +6484,9 @@
     "contact_alpha_threshold": 32,
     "contact_band_fraction": 0.2,
     "grid_fit": {
-      "maximum": 9.082568081176591,
+      "maximum": 9.08256808,
       "points": 30,
-      "rms": 4.178633329197882
+      "rms": 4.17863333
     },
     "growth_scale": 0.75,
     "mode": "visible_contact_center",
@@ -6494,12 +6494,12 @@
     "reference_soil_width": 153,
     "scene_transform": [
       [
-        1.467423053281315,
-        0.07509807118862355
+        1.46742305,
+        0.07509807
       ],
       [
-        0.02736505575131576,
-        -1.4715307877291894
+        0.02736506,
+        -1.47153079
       ]
     ],
     "schema": 4,

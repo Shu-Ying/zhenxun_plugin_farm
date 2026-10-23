@@ -19,6 +19,12 @@ __plugin_meta__ = PluginMetadata(
             help="全部农场图片的编码质量，整数1～95，默认75；"
                  "数值越高通常越清晰、文件越大。仅我的农场支持高清，"
                  "高清质量不低于85。PNG为无损格式，不受此值影响。",
+        ), RegisterConfig(
+            key='资源获取地址', value='Github', default_value='Github',
+            type=str, help='Github、Gitea或farm_service，默认Github；重载生效。',
+        ), RegisterConfig(
+            key='farm_service 地址', value='', default_value='', type=str,
+            help='独立服务基础地址，用于资源及后续活动服务；HTTPS。',
         )],
     ).to_dict(),
 )

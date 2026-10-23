@@ -27,6 +27,14 @@ def image_quality():
     )
 
 
+def resource_options():
+    from zhenxun.configs.config import Config
+
+    config = Config.get(__package__.split('.')[-1])
+    return (config.get('资源获取地址', 'Github', build_model=False),
+            config.get('farm_service 地址', '', build_model=False))
+
+
 logger = logging.getLogger(__name__)
 driver = get_driver()
 data_dir = data_directory(
@@ -39,6 +47,7 @@ runtime = Runtime(
     str(getattr(driver.config, "farm_preview_image_format", "AUTO")).upper(),
     font_dir=FONT_PATH,
     image_quality_provider=image_quality,
+    resource_options_provider=resource_options,
 )
 async def start_runtime():
     from zhenxun.configs.config import Config
