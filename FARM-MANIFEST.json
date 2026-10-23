@@ -49,9 +49,9 @@
   "plugin": "zhenxun_plugin_farm_preview",
   "schema": 1,
   "source": {
-    "commit": "d238005561b2ed29c6f56f75aa6b39a62a55e75b",
+    "commit": "79ae03bf953d5a84d9bb9c9b9b2f3ba0676249ff",
     "dirty": false,
-    "message": "fixed # 新增本地部署脚本，一键生成对应平台的压缩包内容",
+    "message": "fixed # 修复工作流BUG",
     "repository": "https://github.com/Shu-Ying/main_plugin_farm.git"
   },
   "target": "zhenxun",
