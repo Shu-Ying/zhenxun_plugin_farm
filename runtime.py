@@ -31,11 +31,13 @@ COMMANDS = {
     "作物加锁":"lock", "作物解锁":"unlock", "出售作物":"sell",
     "农场除虫":"clear_pests", "除虫":"clear_pests", "地块编号":"plot_ids",
     "偷菜":"steal",
+    "开垦":"reclaim",
 }
 HELP = (
     "开通农场 [名称]｜我的农场 [高清]｜农场详述 [页码]\n"
     "地块编号｜查看当前土地编号及开垦位置\n"
     "偷菜 @目标｜每日最多5次成功偷取\n"
+    "开垦｜每次增加1块普通空地；开垦 条件｜查看等级和费用\n"
     "我的种子/我的作物 [页码] [文字]，默认图片。\n"
     "全部图片使用农场图片质量配置；仅我的农场支持高清。\n"
     "种子商店 [页码]｜购买种子 作物 数量｜播种 作物 [数量]\n"
@@ -51,6 +53,13 @@ HELP = (
     "旧版农场数据在首次使用时迁移，绑定当前机器人和平台。"
 )
 ERRORS = {
+    'land_origin_unknown': '农场初始土地来源无法确认，未补地或扣币，'
+                           '请联系管理员核查注册或迁移记录。',
+    'land_compensation_capacity': '旧用户补3块后将超出当前30个绘图位置，'
+                                 '已保留原状，请联系管理员单独处理补偿。',
+    'land_layout_invalid': '地块编号或数量异常，未补地或扣币，请联系管理员核查。',
+    'land_rules_invalid': '开垦配置异常，未扣币，请联系管理员检查。',
+    'land_rule_unavailable': '下一块地的开垦规则尚未配置，未扣币。',
     'cannot_steal_self': '不能偷自己的农场。',
     'different_farm_scope': '只能偷取当前机器人、平台内的农场。',
     'target_not_registered': '目标尚未开通当前农场。',
@@ -204,6 +213,16 @@ class Runtime:
             )
             if action == "help":
                 return HELP
+            if action == 'reclaim' and args == ['条件']:
+                conditions = await self.service.reclaim_conditions(who)
+                return (
+                    f"下一块：{conditions['slot']}号普通空地\n"
+                    f"所需等级：{conditions['required_level']}"
+                    f"（当前{conditions['level']}）\n"
+                    f"所需农场币：{conditions['coin_cost']}"
+                    f"（当前{conditions['point']}）\n"
+                    '满足条件后发送：开垦'
+                )
             image_actions = ('farm', 'plot_ids', 'details', 'shop',
                              'seeds', 'crops')
             if action in image_actions and action != 'farm' and '高清' in args:
@@ -347,7 +366,7 @@ class Runtime:
                 receipt = await self.service.lock(
                     who, args[0], action == "lock", op,
                 )
-            elif action in ("harvest", "eradicate", "clear_pests"):
+            elif action in ("harvest", "eradicate", "clear_pests", "reclaim"):
                 if args:
                     raise ValueError()
                 receipt = await getattr(self.service, action)(who, op)

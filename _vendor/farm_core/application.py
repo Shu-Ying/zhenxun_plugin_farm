@@ -1,6 +1,7 @@
 """应用用例：一次业务动作对应一次完整存储事务。"""
 
 from dataclasses import asdict, replace
+import logging
 import time
 import secrets
 
@@ -11,6 +12,10 @@ from .domain import (
 from .ports import Store
 from .pests import advance_plot, start_growth
 from .yield_rules import season_yield, remaining_yield
+from .land import COMPENSATION_ID, SUPPORTED_PLOTS, next_rule, owned_count
+
+
+LOGGER = logging.getLogger(__name__)
 
 
 class FarmService:
@@ -30,6 +35,7 @@ class FarmService:
         self._identity(identity)
         text(operation_id)
         now = integer(self.clock())
+        await self.ensure_initial_plots(identity)
         return await self.store.transact(
             identity, operation_id, action, parameters, now,
             lambda repository: operation(repository, now),
@@ -45,10 +51,69 @@ class FarmService:
     async def snapshot(self, identity: Identity):
         self._identity(identity)
         now = integer(self.clock())
+        await self.ensure_initial_plots(identity)
         snapshot = await self.store.snapshot(identity)
         return replace(snapshot, plots=tuple(
             advance_plot(plot, now) for plot in snapshot.plots
         ))
+
+    async def ensure_initial_plots(self, identity: Identity):
+        self._identity(identity)
+
+        def operation(repository):
+            repository.account()
+            initial = repository.registration_plot_count()
+            if initial is None:
+                raise FarmError('land_origin_unknown')
+            count = owned_count(repository.plots())
+            if count < initial:
+                raise FarmError('land_layout_invalid')
+            added = 3 if initial == 3 else 0
+            if count + added > SUPPORTED_PLOTS:
+                raise FarmError('land_compensation_capacity')
+            for slot in range(count + 1, count + added + 1):
+                repository.add_plot(slot)
+            return self._result(
+                repository, added=added, previous_plot_count=count,
+                plot_count=count + added, original_plot_count=initial,
+            )
+
+        try:
+            return await self.store.transact(
+                identity, COMPENSATION_ID, 'land_compensation', {'version': 1},
+                integer(self.clock()), operation,
+            )
+        except FarmError as error:
+            if error.code != 'not_registered':
+                LOGGER.warning('farm initial land preparation failed reason=%s',
+                               error.code)
+                raise
+            return None
+
+    async def reclaim_conditions(self, identity: Identity):
+        snapshot = await self.snapshot(identity)
+        rule = next_rule(snapshot.plots)
+        return {
+            'slot': rule.ordinal, 'required_level': rule.required_level,
+            'coin_cost': rule.coin_cost, 'level': snapshot.account.level,
+            'point': snapshot.account.point,
+        }
+
+    async def reclaim(self, identity: Identity, operation_id: str):
+        def operation(repository, now):
+            account = repository.account()
+            rule = next_rule(repository.plots())
+            if account.level < rule.required_level:
+                raise FarmError('level_required')
+            repository.asset(Asset.POINT, -rule.coin_cost)
+            repository.add_plot(rule.ordinal)
+            return self._result(
+                repository, slot=rule.ordinal, quantity=1,
+                cost=rule.coin_cost, plot_count=rule.ordinal,
+            )
+
+        return await self._execute(identity, operation_id, 'reclaim', {},
+                                   operation)
 
     async def register(
         self, identity: Identity, name: str, operation_id: str,

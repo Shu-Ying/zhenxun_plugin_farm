@@ -76,6 +76,38 @@ class SQLiteRepository:
             ),
         )
 
+    def registration_plot_count(self) -> int | None:
+        rows = self._db.execute(
+            "SELECT action, result FROM operations WHERE identity=? "
+            "AND action IN ('legacy_import', 'register') "
+            "ORDER BY created_at, rowid", (self._identity,),
+        ).fetchall()
+        try:
+            for row in rows:
+                data = json.loads(row['result'])
+                if row['action'] == 'legacy_import':
+                    if (type(data.get('migration_version')) is int
+                            and data['migration_version'] == 1
+                            and data.get('legacy_rows', {}).get('user')):
+                        return 3
+                elif data.get('created') is True:
+                    count = data.get('plot_count', 3)
+                    if type(count) is int and count in (3, 6):
+                        return count
+                    return None
+        except (ValueError, TypeError, AttributeError):
+            return None
+        return None
+
+    def add_plot(self, slot: int) -> None:
+        from .land import SUPPORTED_PLOTS
+
+        integer(slot, 1, SUPPORTED_PLOTS)
+        self._db.execute(
+            'INSERT INTO plots(identity, slot) VALUES (?, ?)',
+            (self._identity, slot),
+        )
+
     def item(self, plant: Plant) -> InventoryItem:
         row = self._db.execute(
             "SELECT name, seeds, crops, locked FROM inventory "

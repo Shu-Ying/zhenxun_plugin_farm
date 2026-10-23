@@ -27,7 +27,7 @@ def receipt_text(receipt: Receipt) -> str:
         "register": "注册", "buy": "购买", "sow": "播种",
         "harvest": "收获", "eradicate": "铲除",
         "lock": "锁定设置", "sell": "出售",
-        "clear_pests": "除虫",
+        "clear_pests": "除虫", "reclaim": "开垦",
     }
     data = receipt.data
     account = data["account"]
@@ -40,6 +40,10 @@ def receipt_text(receipt: Receipt) -> str:
         lines.append(f"本次收入：{data['proceeds']}")
     if "experience" in data:
         lines.append(f"本次经验：+{data['experience']}")
+    if receipt.action == 'reclaim':
+        lines.append(f"新增地块：{data['slot']}号普通空地")
+        lines.append(f"本次消耗：{data['cost']}农场币")
+        lines.append(f"当前土地：{data['plot_count']}块")
     for item in data.get("harvested", ()):
         if item.get("yield_loss_percent", 0):
             lines.append(
