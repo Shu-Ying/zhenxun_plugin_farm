@@ -4,12 +4,6 @@
 
 <img src="./logo.png" width="400" alt="真寻农场 Logo">
 
-> 资源配置：「资源获取地址」默认Github，可选Github、Gitea、farm_service；
-> 「farm_service 地址」始终独立存在，供资源及后续活动服务共用。
-> 选择farm_service下载时填写HTTPS基础地址，两项修改后重载。
-> 插件不携带assets.zip，启动校验缓存SHA256，缺失或不匹配时从所选源获取；
-> Github/Gitea均使用farm_service仓库根目录assets/。失败保留文字功能，重载重试。
-> 活动服务尚未实现，请先发布服务仓库素材再发布插件。
 <p align="center">
     <a href="./LICENSE">
         <img src="https://img.shields.io/badge/license-GPL3.0-FE7D37" alt="license">
@@ -19,12 +13,6 @@
     </a>
     <a href="https://github.com/astral-sh/ruff">
         <img src="https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/charliermarsh/ruff/main/assets/badge/v2.json" alt="ruff">
-    </a>
-    <a href="https://nonebot.dev/">
-        <img src="https://img.shields.io/badge/Nonebot-2.0.0%2B-black" alt="Nonebot">
-    </a>
-    <a href="https://github.com/zhenxun-org/zhenxun_bot">
-        <img src="https://img.shields.io/badge/zhenxun-0.2.4%2B-%23ECD9D3" alt="Python">
     </a>
 </p>
 
@@ -45,10 +33,7 @@
   - [目录](#目录)
   - [农场界面](#农场界面)
   - [如何安装](#如何安装)
-  - [使用指令](#使用指令)
-  - [更新日志(详细)：](#更新日志详细)
-  - [用户方面](#用户方面)
-  - [代码方面](#代码方面)
+  - [农场帮助](#农场帮助)
   - [待办事宜 `Todo` 列表](#待办事宜-todo-列表)
   - [关于](#关于)
   - [致谢](#致谢)
@@ -70,43 +55,10 @@
 
 ---
 
-## 使用指令
-
-| 指令 | 描述 | Tip |
-| --- | --- | --- |
-| @小真寻 开通农场 | 首次开通农场 |  |
-| 我的农场 | 你的农场 |  |
-| 农场详述 | 农场详细信息 |  |
-| 我的农场币 | 查询农场币 |  |
-| 种子商店 [筛选关键字] [页数] or [页数] | 查看种子商店 | 当第一个参数为非整数时，会默认进入筛选状态。页数不填默认为1 |
-| 购买种子 [种子名称] [数量] | 购买种子 | 数量不填默认为1 |
-| 我的种子 | 查询仓库种子 |  |
-| 播种 [种子名称] [数量] | 播种种子 | 数量不填默认将最大可能播种 |
-| 收获 | 收获成熟作物 |  |
-| 铲除 | 铲除荒废作物 |  |
-| 我的作物 | 你的作物 |  |
-| 出售作物 [作物名称] [数量] | 从仓库里向系统售卖作物 | 不填写作物名将售卖仓库种全部作物 填作物名不填数量将指定作物全部出售 |
-| 偷菜 @美波理 | 偷别人的菜 | 每人每天只能偷5次 |
-| 购买农场币 | 将真寻金币兑换成农场币 | 兑换比例默认为1:2 手续费默认20% |
-| 更改农场名 [新的农场名] | 改名 | 农场名称无法存储特殊字符 |
-| 农场签到 | 签到 | 需要注意，该项会从服务器拉取签到数据 |
-| 土地升级 [地块ID] | 将土地升级，带来收益提升 | 如果土地升级时，土地有播种作物，那么将直接成熟 |
+## 农场帮助
+![农场帮助](./images/help-zhenxun.png)
 
 ---
-
-## 更新日志[(详细)](./log/log.md)：
-用户方面
----
-- 新增土地升级指令，快来将土地升级至红土地、黑土地、金土地吧
-- 新增查漏补缺作物资源功能，自动更新最新作物和作物资源文件
-- 定时更新签到文件、作物资源从00:30调整至04:30
-- 修正了部分土地资源错误的情况
-- 修正了部分文本信息错误的情况
-
-代码方面
----
-- 修正部分事件连接机制
-- 修正网络请求端口
 
 ## 待办事宜 `Todo` 列表
 
@@ -134,16 +86,21 @@
 
 最后感谢以下框架/作者的提供的技术支持(排名不分先后):
 
-- [QQ农场](https://qqnc.qq.com/) * 绝大多数的素材来源 *
+- [QQ农场](https://qqnc.qq.com/) *绝大多数的素材来源*
+- [小赖字体](https://github.com/lxgw/kose-font) *lxgw 提供的开源中文手写字体，采用 SIL OFL 1.1，随包附带完整字体许可*
 - [Nonebot2](https://github.com/nonebot/nonebot2) *✨ 跨平台 Python 异步机器人框架 ✨*
 - [zhenxun_bot](https://github.com/zhenxun-org/zhenxun_bot) *最爱真寻的一集*
 - [HibiKier](https://github.com/HibiKier) *阿咪为什么是神*
 - [ATTomato](https://github.com/ATTomatoo) *流泪偷码头.jpg*
+- [ChatGPT](https://chatgpt.com/) *AI神力*
 
 ## 许可证
 
 `真寻农场(zhenxun_plugin_farm)`将采用的是`GPLv3`许可证进行开源
 
+默认使用的小赖字体由 farm_service 分发，单独遵循 `SIL OFL 1.1`，完整版权声明与许可见
+[OFL-Xiaolai.txt](./_vendor/farm_render/data/OFL-Xiaolai.txt)。
+
 ## 上游仓库
 
-- [Client](https://github.com/Shu-Ying/main_plugin_farm)
+- [main_plugin_farm](https://github.com/Shu-Ying/main_plugin_farm)

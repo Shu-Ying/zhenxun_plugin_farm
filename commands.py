@@ -10,7 +10,7 @@ from nonebot.params import CommandArg
 
 require("nonebot_plugin_uninfo")
 from nonebot_plugin_uninfo import Uninfo
-from zhenxun.configs.path_config import DATA_PATH, FONT_PATH
+from zhenxun.configs.path_config import DATA_PATH
 from zhenxun.utils.message import MessageUtils
 from zhenxun.utils.platform import PlatformUtils
 
@@ -42,10 +42,12 @@ data_dir = data_directory(
 )
 runtime = Runtime(
     data_dir,
-    getattr(driver.config, "farm_preview_font", None),
-    getattr(driver.config, "farm_preview_deployment", "zhenxun-preview"),
-    str(getattr(driver.config, "farm_preview_image_format", "AUTO")).upper(),
-    font_dir=FONT_PATH,
+    deployment=getattr(
+        driver.config, "farm_preview_deployment", "zhenxun-preview",
+    ),
+    image_format=str(getattr(
+        driver.config, "farm_preview_image_format", "AUTO",
+    )).upper(),
     image_quality_provider=image_quality,
     resource_options_provider=resource_options,
 )

@@ -4,6 +4,6 @@ from pathlib import Path
 
 
 def data_directory(base, configured=None):
-    if configured is not None:
-        return Path(configured)
+    if configured:
+        return Path(configured).expanduser()
     return Path(base) / 'farm_db'
