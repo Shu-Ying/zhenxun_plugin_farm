@@ -434,9 +434,9 @@ class SQLiteStore:
                     connection.commit()
                 except BaseException as exc:
                     connection.rollback()
-                    LOGGER.log(
-                        logging.INFO if isinstance(exc, FarmError)
-                        else logging.WARNING,
+                    report = (LOGGER.info if isinstance(exc, FarmError)
+                              else LOGGER.warning)
+                    report(
                         "farm rollback action=%s operation=%s error=%s",
                         action, operation_id, type(exc).__name__,
                     )

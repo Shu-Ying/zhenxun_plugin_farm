@@ -140,6 +140,7 @@ def load_catalogue_release(data_dir, source='Github', service_url='',
                 if not set(required_ids).issubset(
                         plant.plant_id for plant in current.catalogue):
                     raise ValueError('catalogue missing player crop ID')
+                logger.info('农场作物版本未变化：复用已校验缓存')
                 return replace(current, origin='remote')
             try:
                 candidate = _snapshot(target, manifest, previous, required_ids,
@@ -174,6 +175,7 @@ def load_catalogue_release(data_dir, source='Github', service_url='',
             previous_images = (current or bootstrap).metadata['images']
             if not set(previous_images).issubset(candidate.metadata['images']):
                 raise ValueError('Catalogue removed existing image paths')
+            logger.info('农场作物列表、配置和素材校验通过：正在切换版本')
             _atomic(root / 'current.json', canonical(manifest))
             logger.info('farm catalogue ready release=%s source=%s',
                         manifest['release'], source)
@@ -186,8 +188,10 @@ def load_catalogue_release(data_dir, source='Github', service_url='',
             if not set(required_ids).issubset(
                     plant.plant_id for plant in current.catalogue):
                 raise ValueError('catalogue missing player crop ID')
+            logger.info('农场更新不可用：使用已校验的作物缓存版本')
             return current
         bootstrap = _bootstrap(required_ids)
+        logger.info('农场更新不可用：使用内置作物版本')
         # 若旧方式图片缓存可用，离线初始版本也能继续绘图。
         cached = (Path(data_dir) / 'assets'
                   / bootstrap.manifest['files']['assets.zip']['sha256']
