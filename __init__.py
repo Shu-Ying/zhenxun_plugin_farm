@@ -3,7 +3,6 @@
 from nonebot.plugin import PluginMetadata
 from zhenxun.configs.utils import Command, PluginExtraData, RegisterConfig
 
-from ._version import __version__
 from .runtime import COMMANDS, HELP
 
 __plugin_meta__ = PluginMetadata(
@@ -12,7 +11,7 @@ __plugin_meta__ = PluginMetadata(
     homepage="https://github.com/Shu-Ying/zhenxun_plugin_farm",
     supported_adapters={"~onebot.v11", "~qq"},
     extra=PluginExtraData(
-        author="Shu-Ying", version=__version__, menu_type="群内小游戏",
+        author="Shu-Ying", version="2.0.5", menu_type="群内小游戏",
         commands=[Command(command=name) for name in COMMANDS],
         configs=[RegisterConfig(
             key="农场图片质量", value=75, default_value=75, type=int,

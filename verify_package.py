@@ -1,6 +1,7 @@
 """独立验证生成的真寻包；仅标准库，不导入或启动插件。"""
 
 import argparse
+import ast
 import hashlib
 import json
 from pathlib import Path, PurePosixPath
@@ -45,6 +46,16 @@ def verify_files(files):
         raise ValueError('Resource ZIP must not be in plugin repository')
     if not required <= set(files):
         raise ValueError("Incomplete plugin")
+    tree = ast.parse(files['__init__.py'])
+    versions = [
+        keyword.value for node in ast.walk(tree)
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+        and node.func.id == 'PluginExtraData'
+        for keyword in node.keywords if keyword.arg == 'version'
+    ]
+    if (len(versions) != 1 or not isinstance(versions[0], ast.Constant)
+            or versions[0].value != manifest['version']):
+        raise ValueError('PluginExtraData requires matching literal version')
     return manifest
 
 

@@ -2,8 +2,8 @@
   "files": {
     ".github/workflows/verify.yml": "d2b042fe0c2b6aa6a8ee1e0c30b437624da0672841fb21347541369787a7743d",
     "LICENSE": "8b1ba204bb69a0ade2bfcf65ef294a920f6bb361b317dba43c7ef29d96332b9b",
-    "README.md": "492f6db94cc84824c5f83e300e5d51e5066bfe827e078892aa84fa9bd5fd3956",
-    "__init__.py": "758a642304878ed8be295c792c51d72df9a267d35d573db334f7db2c19c7faad",
+    "README.md": "5f29662cb5cd013fd870c4256b4978fe7bb01de3c0d811c8fb2b1dbec84776c9",
+    "__init__.py": "4ff7293232d5b2ec95f167014fd71d5fa7cc6241577ff529839cbecf9d2fbd2f",
     "_vendor/__init__.py": "79e09ef3268808d729d65e7deafdae6352ba491d920b2cc7b5acc95e7ece804d",
     "_vendor/farm_core/__init__.py": "c01dd23608fca46ec558381c843691267de9ce1e43043146835eba6878031ae5",
     "_vendor/farm_core/__main__.py": "b05956741a265e03f4c51b9ed9c1c7e1832106fb1c0fa6ffdc9f433039640ac0",
@@ -49,7 +49,7 @@
     "_vendor/farm_render/service.py": "fa35eb6b928b28e0e9ff1edfcb4e747de4efc9743db748911903121b3043c647",
     "_vendor/farm_render/shop.py": "c1a478b7fceb84728b842f0ce80bb6cfc608dbf465ca82064c0f4eebdeb0fce3",
     "_vendor/farm_render/warehouse.py": "a688ad36b9a91a71211e0dedf814f50bac3ec5c2c36f02a091f36008b87ffb61",
-    "_version.py": "64e838d5a0a0284b8e6cae5685e8229177a4b4558f25a799f9330387429ef793",
+    "_version.py": "c446fb6786fcc5a9575c4c41838d973c085b24a9e21f372c10f8e9fba4b7a698",
     "commands.py": "e2319b0cc4264916392ca8fc0527424450340e1a8f25db7a41845dd45389d14d",
     "config_migration.py": "f2efdc046e4a57756189fedc734e0049a68416df2239cc0276a948436d284a5c",
     "data_paths.py": "9f9b6f46141b43ca756579b65d5471701e02195287a1430b542902d84d78947f",
@@ -59,17 +59,17 @@
     "requirements.txt": "854e17e5197a07388260edfe282c038ef2af11d1ba964c07c85173bcea01c48d",
     "runtime.py": "f92ad09322937ad4f59a80b84847cc9e6271ee61bbf2b5668cc1554005acfba9",
     "runtime_logging.py": "36c177b8f8fd385d2a0f410322cd26614686e441cc0a5b5377c9e658f26d5f4d",
-    "verify_package.py": "aa96f15f7ec9b1e2086d3d544e1dd9ee4a2ad174369df5bd9a2b1f544c60920d",
-    "version.txt": "a8d4609d3074178dfd6e468d23fe83f2ea46e02faecff056938b59256e7f5bb6"
+    "verify_package.py": "e83d87e9674a4e46cdae0f79f78eec52c77e47ecb8dc5af8d188545705e32a10",
+    "version.txt": "ce0a2005da2b159fde33efc005d063470ccc2ccc54ffb702dfafb2c330285040"
   },
   "plugin": "zhenxun_plugin_farm_preview",
   "schema": 1,
   "source": {
-    "commit": "d05b2e57654542615f36ca456a91fede74ca765a",
+    "commit": "c6b504924e57bc287f746dc0c37db5af0f11c9bd",
     "dirty": false,
-    "message": "fixed # 修复astrbot日志未使用logging.basicConfig",
+    "message": "fixed # 修复部分工作流BUG",
     "repository": "https://github.com/Shu-Ying/main_plugin_farm.git"
   },
   "target": "zhenxun",
-  "version": "2.0.4"
+  "version": "2.0.5"
 }

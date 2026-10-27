@@ -50,24 +50,11 @@
 
 ## 如何安装
 
-使用真寻分发仓库的完整生成内容或Actions中的真寻预览包，不能直接
-复制主仓库的integrations目录。先停止机器人，备份代码与数据，停用
-会注册同名命令的旧插件，再在宿主环境安装本插件requirements.txt。
-Pillow要求>=10.4,<11，不强制升级宿主到12。安装后手工启动并检查日志。
+方法一（推荐）：在小真寻后台的插件商店下载即可
 
-默认数据目录为真寻DATA_PATH下的farm_db，新库为farm.sqlite3，日志为
-farm-preview.log；旧farm.db不得直接改名覆盖。资源源默认Github，可在
-网页配置选择Gitea/farm_service；服务地址独立保留，修改资源源后重载。
-图片质量默认75、整数1～95，仅“我的农场 高清”支持高清且质量至少85。
-资源或字体下载失败时文字业务仍可用，详细原因见日志。
+方法二：下载源码放在小真寻`plugin`目录下
 
-升级前停机备份完整代码与数据目录；安装器拒绝覆盖，先移走旧目录。
-回退需匹配代码和数据库备份，不让旧代码强行打开新schema；恢复旧数据
-会丢失备份后进度。卸载时停止加载并移走插件代码，保留数据供恢复。
-
-开发者构建、包验证、安全安装、配置、备份卸载与Secrets详见
-[当前维护说明](https://github.com/Shu-Ying/main_plugin_farm/blob/main/docs/zhenxun-preview-current.md)。
-本地离线验证不代表真实真寻宿主、公开资源或远端发布已验证。
+`在安装后，每次启动均会向`[farm_service](https://github.com/Shu-Ying/farm_service)`仓库进行下载资源，默认使用Github进行下载，可以在设置中切换为Gitea镜像`
 
 ---
 
