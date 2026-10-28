@@ -1,3 +1,4 @@
 # 使用宿主已有的NoneBot/真寻/Alconna/Uninfo，不重复安装宿主。
 # 与真寻当前pillow<11的约束取交集，不升级到12。
 Pillow>=10.4,<11
+rich>=13.9,<16

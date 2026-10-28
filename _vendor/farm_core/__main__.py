@@ -29,9 +29,16 @@ async def demo(database):
             print(receipt_text(receipt))
         clock[0] = plant.growth_seconds
         print(receipt_text(await service.harvest(identity, "demo-harvest")))
-        print(receipt_text(await service.sell(
-            identity, None, None, "demo-sell",
-        )))
+        print(
+            receipt_text(
+                await service.sell(
+                    identity,
+                    None,
+                    None,
+                    "demo-sell",
+                )
+            )
+        )
         print(snapshot_text(await service.snapshot(identity)))
     finally:
         await store.close()
@@ -44,7 +51,8 @@ def main():
     database = Path(args.database).resolve()
     database.parent.mkdir(parents=True, exist_ok=True)
     logging.basicConfig(
-        filename=database.with_suffix(".log"), encoding="utf-8",
+        filename=database.with_suffix(".log"),
+        encoding="utf-8",
         level=logging.INFO,
         format="%(asctime)s %(levelname)s %(name)s %(message)s",
     )
